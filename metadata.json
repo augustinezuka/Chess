@@ -1,0 +1,6 @@
+{
+  "name": "Chess Tactics Game",
+  "description": "A feature-rich chess platform with local and AI match modes, real-time tactical advice, and a comprehensive openings explorer featuring 50+ classical lines, live detection, and interactive memorization practice.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
