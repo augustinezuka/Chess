@@ -586,45 +586,88 @@ export function getBestMove(fen: string, difficulty: Difficulty): string {
   const activeColor = chess.turn();
   const isMaximizing = activeColor === "w";
 
-  // Difficulty configurations:
-  // - Easy: Depth 1 + 35% chance to play a completely random legal move
+  // --- Dynamic Opening Book ---
+  // If starting position, randomly pick a standard solid opening move
+  const startingFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+  if (fen === startingFen) {
+    const commonWhiteOpenings = ["e4", "d4", "Nf3", "c4"];
+    return commonWhiteOpenings[Math.floor(Math.random() * commonWhiteOpenings.length)];
+  }
+
+  // If Black's very first reply to e4 or d4, offer standard thematic defenses
+  if (chess.history().length === 1 && activeColor === "b") {
+    const whiteMove = chess.history()[0];
+    if (whiteMove === "e4") {
+      const responses = ["c5", "e5", "e6", "c6"]; // Sicilian, Open Game, French, Caro-Kann
+      return responses[Math.floor(Math.random() * responses.length)];
+    }
+    if (whiteMove === "d4") {
+      const responses = ["Nf6", "d5", "e6"]; // Indian Defense, Queen's Gambit reply, Nimzo / Dutch prep
+      return responses[Math.floor(Math.random() * responses.length)];
+    }
+  }
+
+  // --- Difficulty / Depth Configurations ---
+  let targetDepth = 1;
+  let errorRate = 0;
+
   if (difficulty === "Easy") {
-    if (Math.random() < 0.35) {
-      const randomIndex = Math.floor(Math.random() * moves.length);
-      return moves[randomIndex];
-    }
-    const memo = new Map<string, CacheEntry>();
-    const result = minimax(chess, 1, -Infinity, Infinity, isMaximizing, memo);
-    return result.move || moves[0];
+    targetDepth = 1;
+    errorRate = 0.35;
+  } else if (difficulty === "Medium") {
+    targetDepth = 2;
+    errorRate = 0.10;
+  } else {
+    targetDepth = 3;
+    errorRate = 0;
   }
 
-  // - Medium: Iterative deepening up to depth 2 + quiescence, solid tactical awareness, 10% chance of mistake
-  if (difficulty === "Medium") {
-    if (Math.random() < 0.10) {
-      const randomIndex = Math.floor(Math.random() * moves.length);
-      return moves[randomIndex];
-    }
-    const memo = new Map<string, CacheEntry>();
-    let bestMove = moves[0];
-    for (let d = 1; d <= 2; d++) {
-      const result = minimax(chess, d, -Infinity, Infinity, isMaximizing, memo);
-      if (result.move) {
-        bestMove = result.move;
-      }
-    }
-    return bestMove;
+  // Error rate chance of picking a completely random legal move (simulates blunder/mistake)
+  if (Math.random() < errorRate) {
+    const randomIndex = Math.floor(Math.random() * moves.length);
+    return moves[randomIndex];
   }
 
-  // - Hard: Iterative deepening up to depth 3 + quiescence, master-level tactical & positional look-ahead
+  // --- Multi-Move Evaluation with Random Choice among top moves ---
+  const moveScores: { move: string; score: number }[] = [];
   const memo = new Map<string, CacheEntry>();
-  let bestMove = moves[0];
-  for (let d = 1; d <= 3; d++) {
-    const result = minimax(chess, d, -Infinity, Infinity, isMaximizing, memo);
-    if (result.move) {
-      bestMove = result.move;
+
+  for (const move of moves) {
+    try {
+      chess.move(move);
+      // Run search at targetDepth - 1 from the next position
+      const score = minimax(chess, targetDepth - 1, -Infinity, Infinity, !isMaximizing, memo).score;
+      chess.undo();
+      moveScores.push({ move, score });
+    } catch {
+      // Fallback
     }
   }
-  return bestMove;
+
+  if (moveScores.length === 0) return moves[0];
+
+  // Sort moves based on active color maximizing/minimizing
+  if (isMaximizing) {
+    moveScores.sort((a, b) => b.score - a.score);
+  } else {
+    moveScores.sort((a, b) => a.score - b.score);
+  }
+
+  const bestScore = moveScores[0].score;
+  
+  // Collect all moves that are "very close" to the absolute best score (within 15 centipawns / 0.15 pawns)
+  // This breaks strict tie/ordering determinism and adds great human-like variance to mid-game choices!
+  const margin = 15;
+  const topMoves = moveScores.filter((ms) => {
+    if (isMaximizing) {
+      return ms.score >= bestScore - margin;
+    } else {
+      return ms.score <= bestScore + margin;
+    }
+  });
+
+  const chosen = topMoves[Math.floor(Math.random() * topMoves.length)];
+  return chosen.move;
 }
 
 /**

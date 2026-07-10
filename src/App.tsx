@@ -104,7 +104,7 @@ export default function App() {
     }
   });
 
-  const [boardTheme, setBoardTheme] = useState<"slate" | "wood" | "emerald" | "midnight">(() => {
+  const [boardTheme, setBoardTheme] = useState<"slate" | "wood" | "emerald" | "midnight" | "ocean" | "crimson" | "desert" | "cyberpunk" | "forest" | "arctic" | "vintage" | "royal">(() => {
     try {
       const saved = localStorage.getItem("chess_trainer_board_theme");
       return (saved as any) || "slate";
@@ -113,7 +113,7 @@ export default function App() {
     }
   });
 
-  const [pieceStyle, setPieceStyle] = useState<"classic" | "minimal" | "abstract">(() => {
+  const [pieceStyle, setPieceStyle] = useState<"classic" | "minimal" | "abstract" | "neon" | "royal" | "nature">(() => {
     try {
       const saved = localStorage.getItem("chess_trainer_piece_style");
       return (saved as any) || "classic";
@@ -1130,6 +1130,102 @@ export default function App() {
       lastMoveDark: "bg-cyan-600/40 ring-1 ring-cyan-500/50",
       dangerLight: "bg-rose-950/60 border border-rose-500/40",
       dangerDark: "bg-rose-950/85 border border-rose-600/50"
+    },
+    ocean: {
+      name: "Ocean Breeze",
+      lightSquare: "bg-[#E0F2FE]",
+      darkSquare: "bg-[#0284C7]",
+      selected: "bg-sky-200/90 ring-2 ring-sky-600 ring-inset",
+      validDestLight: "bg-[#BAE6FD]",
+      validDestDark: "bg-[#0369A1]/90 text-sky-50",
+      lastMoveLight: "bg-amber-200/70 ring-1 ring-amber-400/50",
+      lastMoveDark: "bg-amber-500/65 ring-1 ring-amber-500/50",
+      dangerLight: "bg-red-100/90 border border-red-300",
+      dangerDark: "bg-red-900/60 border border-red-400"
+    },
+    crimson: {
+      name: "Crimson Dawn",
+      lightSquare: "bg-[#FFF1F2]",
+      darkSquare: "bg-[#9F1239]",
+      selected: "bg-rose-200/90 ring-2 ring-rose-600 ring-inset",
+      validDestLight: "bg-[#FECDD3]",
+      validDestDark: "bg-[#BE123C]/90 text-rose-50",
+      lastMoveLight: "bg-amber-100/70 ring-1 ring-amber-400/50",
+      lastMoveDark: "bg-amber-600/70 ring-1 ring-amber-500/50",
+      dangerLight: "bg-orange-100/90 border border-orange-300",
+      dangerDark: "bg-orange-900/60 border border-orange-400"
+    },
+    desert: {
+      name: "Desert Dunes",
+      lightSquare: "bg-[#FEF3C7]",
+      darkSquare: "bg-[#D97706]",
+      selected: "bg-yellow-200/90 ring-2 ring-yellow-600 ring-inset",
+      validDestLight: "bg-[#FDE68A]",
+      validDestDark: "bg-[#B45309]/90 text-amber-50",
+      lastMoveLight: "bg-teal-200/70 ring-1 ring-teal-500/50",
+      lastMoveDark: "bg-teal-600/60 ring-1 ring-teal-400/50",
+      dangerLight: "bg-red-100/90 border border-red-300",
+      dangerDark: "bg-red-900/60 border border-red-400"
+    },
+    cyberpunk: {
+      name: "Neon Cyberpunk",
+      lightSquare: "bg-[#1E1B4B]",
+      darkSquare: "bg-[#030712]",
+      selected: "bg-[#F43F5E]/30 ring-2 ring-[#F43F5E] ring-inset",
+      validDestLight: "bg-[#06B6D4]/30 ring-1 ring-[#06B6D4]",
+      validDestDark: "bg-[#EC4899]/30 ring-1 ring-[#EC4899]",
+      lastMoveLight: "bg-[#EAB308]/35 ring-1 ring-[#EAB308]/50",
+      lastMoveDark: "bg-[#F97316]/40 ring-1 ring-[#F97316]/50",
+      dangerLight: "bg-red-950/50 border border-red-500/50",
+      dangerDark: "bg-red-950/80 border border-red-600/50"
+    },
+    forest: {
+      name: "Deep Forest",
+      lightSquare: "bg-[#E2EAE0]",
+      darkSquare: "bg-[#2D5A27]",
+      selected: "bg-emerald-300/80 ring-2 ring-emerald-700 ring-inset",
+      validDestLight: "bg-[#C2DFBE]",
+      validDestDark: "bg-[#1C3E17]/90 text-emerald-50",
+      lastMoveLight: "bg-[#FFE4A0]/70 ring-1 ring-yellow-400/50",
+      lastMoveDark: "bg-[#D97706]/75 ring-1 ring-amber-500/50",
+      dangerLight: "bg-red-100 border border-red-300",
+      dangerDark: "bg-red-900/60 border border-red-400"
+    },
+    arctic: {
+      name: "Arctic Ice",
+      lightSquare: "bg-[#F0F9FF]",
+      darkSquare: "bg-[#7DD3FC]",
+      selected: "bg-cyan-200/90 ring-2 ring-cyan-600 ring-inset",
+      validDestLight: "bg-[#BAE6FD]",
+      validDestDark: "bg-[#0284C7]/90 text-cyan-50",
+      lastMoveLight: "bg-purple-200/70 ring-1 ring-purple-400/50",
+      lastMoveDark: "bg-purple-600/70 ring-1 ring-purple-500/50",
+      dangerLight: "bg-red-100 border border-red-300",
+      dangerDark: "bg-red-900/60 border border-red-400"
+    },
+    vintage: {
+      name: "Vintage Sepia",
+      lightSquare: "bg-[#F4EBE1]",
+      darkSquare: "bg-[#9C8470]",
+      selected: "bg-amber-100/90 ring-2 ring-amber-700 ring-inset",
+      validDestLight: "bg-[#EAE0D5]",
+      validDestDark: "bg-[#705844]/90 text-amber-50",
+      lastMoveLight: "bg-orange-200/70 ring-1 ring-orange-400/50",
+      lastMoveDark: "bg-orange-600/70 ring-1 ring-orange-500/50",
+      dangerLight: "bg-red-100 border border-red-300",
+      dangerDark: "bg-red-900/60 border border-red-400"
+    },
+    royal: {
+      name: "Royal Sapphire",
+      lightSquare: "bg-[#F3E8FF]",
+      darkSquare: "bg-[#6B21A8]",
+      selected: "bg-amber-200/90 ring-2 ring-amber-600 ring-inset",
+      validDestLight: "bg-[#E9D5FF]",
+      validDestDark: "bg-[#581C87]/95 text-purple-50",
+      lastMoveLight: "bg-yellow-100/70 ring-1 ring-yellow-400/50",
+      lastMoveDark: "bg-yellow-500/70 ring-1 ring-yellow-500/50",
+      dangerLight: "bg-red-100 border border-red-300",
+      dangerDark: "bg-red-900/60 border border-red-400"
     }
   };
 
@@ -1434,10 +1530,10 @@ export default function App() {
             isLeftSidebarOpen
               ? "fixed inset-y-0 left-0 z-50 w-72 flex animate-slideInLeft"
               : "hidden"
-          } md:relative md:flex md:w-64 border-r border-slate-800 flex-col bg-[#0F172A] h-full shadow-2xl md:shadow-none`}
+          } md:relative md:flex md:w-64 border-r border-slate-800 flex-col bg-[#0F172A] h-full shadow-2xl md:shadow-none overflow-hidden`}
         >
           {/* Mobile close button header */}
-          <div className="md:hidden p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900">
+          <div className="md:hidden p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900 shrink-0">
             <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Match Settings & History</span>
             <button
               onClick={() => setIsLeftSidebarOpen(false)}
@@ -1447,9 +1543,11 @@ export default function App() {
             </button>
           </div>
           
-          {/* Top Panel: Match Settings (Only available in "play" tab) */}
-          {activeTab === "play" && (
-            <div className="p-4 border-b border-slate-800 space-y-3 bg-[#111827]/40">
+          {/* Scrollable Sidebar Content Wrapper */}
+          <div className="flex-1 overflow-y-auto flex flex-col min-h-0 divide-y divide-slate-800/40 custom-scrollbar bg-[#0F172A]">
+            {/* Top Panel: Match Settings (Only available in "play" tab) */}
+            {activeTab === "play" && (
+              <div className="p-4 space-y-3 bg-[#111827]/30">
               <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1">
                 <RotateCcw size={10} /> Match Configuration
               </h2>
@@ -1663,19 +1761,19 @@ export default function App() {
           )}
 
           {/* Saved Matches Log List (Available across tabs for quick lookup) */}
-          <div className="flex-1 p-4 flex flex-col min-h-0 bg-[#0c1322]">
+          <div className="p-4 bg-[#0c1322]/45">
             <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center justify-between">
               <span>Saved Matches</span>
               <span className="text-[9px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded-full">{savedGames.length}</span>
             </h2>
 
             {savedGames.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
+              <div className="flex flex-col items-center justify-center text-center p-4">
                 <Trophy size={20} className="text-slate-600 mb-2" />
                 <p className="text-[10px] text-slate-500">No matches saved yet. Completed matches are analyzed and stored here automatically.</p>
               </div>
             ) : (
-              <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+              <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1 custom-scrollbar">
                 {savedGames.map((g) => {
                   const isSelected = selectedSavedGame?.id === g.id;
                   let resultLabel = "Draw";
@@ -1732,7 +1830,7 @@ export default function App() {
           </div>
 
           {/* Theme & Piece Switcher Panel */}
-          <div className="p-4 border-t border-slate-800 bg-[#070c16] shrink-0">
+          <div className="p-4 bg-[#070c16]/90">
             <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
               <Palette size={11} className="text-indigo-400" />
               <span>Appearance & Themes</span>
@@ -1773,7 +1871,7 @@ export default function App() {
             <div>
               <label className="text-[9px] text-slate-400 block mb-1.5 font-bold uppercase tracking-wider">Piece Style</label>
               <div className="grid grid-cols-3 gap-1 p-1 rounded-lg bg-slate-950 border border-slate-800/80">
-                {(["classic", "minimal", "abstract"] as const).map((styleId) => {
+                {(["classic", "minimal", "abstract", "neon", "royal", "nature"] as const).map((styleId) => {
                   const isSel = pieceStyle === styleId;
                   
                   // Display names for piece styles
@@ -1781,13 +1879,16 @@ export default function App() {
                     classic: "Classic",
                     minimal: "Silhouette",
                     abstract: "Tokens",
+                    neon: "Neon Glow",
+                    royal: "Royal Metal",
+                    nature: "Wood Grain",
                   };
                   
                   return (
                     <button
                       key={styleId}
                       onClick={() => setPieceStyle(styleId)}
-                      className={`py-1 text-[9px] font-bold rounded-md text-center cursor-pointer transition-all ${
+                      className={`py-1 text-[8px] md:text-[9px] font-bold rounded-md text-center cursor-pointer transition-all ${
                         isSel ? "bg-indigo-600 text-white font-extrabold shadow-sm" : "text-slate-400 hover:text-slate-200"
                       }`}
                     >
@@ -1797,6 +1898,7 @@ export default function App() {
                 })}
               </div>
             </div>
+          </div>
           </div>
         </aside>
 
@@ -2530,7 +2632,7 @@ export default function App() {
           )}
 
           {/* Core Content Area */}
-          <div className="flex-1 p-4 overflow-y-auto space-y-4 flex flex-col min-h-0">
+          <div className="flex-1 p-4 overflow-y-auto space-y-4 flex flex-col min-h-0 custom-scrollbar">
             
             {/* MATCH REVIEW PANEL FOR COMPLETED MATCH / REPLAYS */}
             {(selectedSavedGame || (activeTab === "play" && (game.isGameOver() || timerState.timeLimitExceeded || postGameAnalysis))) ? (
