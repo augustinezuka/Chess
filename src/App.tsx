@@ -29,7 +29,8 @@ import {
   XCircle,
   TrendingUp,
   Award,
-  Compass
+  Compass,
+  Palette
 } from "lucide-react";
 import {
   GameMode,
@@ -100,6 +101,24 @@ export default function App() {
       return saved || "10m";
     } catch {
       return "10m";
+    }
+  });
+
+  const [boardTheme, setBoardTheme] = useState<"slate" | "wood" | "emerald" | "midnight">(() => {
+    try {
+      const saved = localStorage.getItem("chess_trainer_board_theme");
+      return (saved as any) || "slate";
+    } catch {
+      return "slate";
+    }
+  });
+
+  const [pieceStyle, setPieceStyle] = useState<"classic" | "minimal" | "abstract">(() => {
+    try {
+      const saved = localStorage.getItem("chess_trainer_piece_style");
+      return (saved as any) || "classic";
+    } catch {
+      return "classic";
     }
   });
 
@@ -262,6 +281,22 @@ export default function App() {
       console.error(e);
     }
   }, [isDangerVisionEnabled]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("chess_trainer_board_theme", boardTheme);
+    } catch (e) {
+      console.error(e);
+    }
+  }, [boardTheme]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("chess_trainer_piece_style", pieceStyle);
+    } catch (e) {
+      console.error(e);
+    }
+  }, [pieceStyle]);
 
   // --- Initial Mount & LocalStorage loading ---
   useEffect(() => {
@@ -1046,6 +1081,58 @@ export default function App() {
     );
   };
 
+  // Board Themes configuration
+  const BOARD_THEMES = {
+    slate: {
+      name: "Slate Modern",
+      lightSquare: "bg-[#E2E8F0]",
+      darkSquare: "bg-[#94A3B8]",
+      selected: "bg-indigo-300/80 ring-2 ring-indigo-500 ring-inset",
+      validDestLight: "bg-[#C7D2FE]",
+      validDestDark: "bg-[#818CF8]",
+      lastMoveLight: "bg-[#FDE047]/65 ring-1 ring-yellow-400/50",
+      lastMoveDark: "bg-[#F59E0B]/55 ring-1 ring-amber-500/50",
+      dangerLight: "bg-red-100 border border-red-200",
+      dangerDark: "bg-red-200/95 border border-red-300"
+    },
+    wood: {
+      name: "Classic Wood",
+      lightSquare: "bg-[#F0D9B5]",
+      darkSquare: "bg-[#B58863]",
+      selected: "bg-amber-200/80 ring-2 ring-amber-600 ring-inset",
+      validDestLight: "bg-[#FFE4A0]",
+      validDestDark: "bg-[#D97706]/70 text-amber-50",
+      lastMoveLight: "bg-cyan-200/70 ring-1 ring-cyan-500/50",
+      lastMoveDark: "bg-cyan-600/60 ring-1 ring-cyan-400/50",
+      dangerLight: "bg-red-100/90 border border-red-300",
+      dangerDark: "bg-red-900/60 border border-red-400"
+    },
+    emerald: {
+      name: "Tournament Green",
+      lightSquare: "bg-[#ECECD7]",
+      darkSquare: "bg-[#739552]",
+      selected: "bg-emerald-200/80 ring-2 ring-emerald-600 ring-inset",
+      validDestLight: "bg-[#A7F3D0]",
+      validDestDark: "bg-[#059669]/85 text-emerald-50",
+      lastMoveLight: "bg-[#FDE047]/65 ring-1 ring-yellow-400/50",
+      lastMoveDark: "bg-[#F59E0B]/55 ring-1 ring-amber-500/50",
+      dangerLight: "bg-red-100/90 border border-red-300",
+      dangerDark: "bg-red-900/60 border border-red-400"
+    },
+    midnight: {
+      name: "Cosmic Midnight",
+      lightSquare: "bg-[#1E293B]",
+      darkSquare: "bg-[#0F172A]",
+      selected: "bg-fuchsia-950/80 ring-2 ring-fuchsia-500 ring-inset",
+      validDestLight: "bg-[#E9D5FF]/30 ring-1 ring-purple-400/50",
+      validDestDark: "bg-[#8B5CF6]/50 ring-1 ring-violet-400/50",
+      lastMoveLight: "bg-cyan-500/35 ring-1 ring-cyan-400/50",
+      lastMoveDark: "bg-cyan-600/40 ring-1 ring-cyan-500/50",
+      dangerLight: "bg-rose-950/60 border border-rose-500/40",
+      dangerDark: "bg-rose-950/85 border border-rose-600/50"
+    }
+  };
+
   // Generate 8x8 Board Grid
   const generateBoardGrid = (chessInstance: Chess, onSquareClick: (sq: string) => void, selSquare: string | null, validDests: string[]) => {
     const ranks = ["8", "7", "6", "5", "4", "3", "2", "1"];
@@ -1104,6 +1191,8 @@ export default function App() {
       }
     }
 
+    const theme = BOARD_THEMES[boardTheme] || BOARD_THEMES.slate;
+
     for (let r = 0; r < 8; r++) {
       for (let c = 0; c < 8; c++) {
         const rankName = activeRanks[r];
@@ -1122,18 +1211,18 @@ export default function App() {
         const isLastMoveTo = lastMove && lastMove.to === sqName;
         const isLastMove = isLastMoveFrom || isLastMoveTo;
 
-        let bgClass = isLight ? "bg-[#E2E8F0]" : "bg-[#94A3B8]"; // Warm off-white & cool gray-blue
+        let bgClass = isLight ? theme.lightSquare : theme.darkSquare;
 
         if (isSelected) {
-          bgClass = "bg-indigo-300/80 ring-2 ring-indigo-500 ring-inset";
+          bgClass = theme.selected;
         } else if (isValidDest) {
-          bgClass = isLight ? "bg-[#C7D2FE]" : "bg-[#818CF8]"; // light indigo highlights
+          bgClass = isLight ? theme.validDestLight : theme.validDestDark;
         } else if (isKingInCheck) {
-          bgClass = "bg-red-400 animate-pulse";
+          bgClass = "bg-red-400 animate-pulse ring-2 ring-red-600 ring-inset";
         } else if (isLastMove) {
-          bgClass = isLight ? "bg-[#FDE047]/65 ring-1 ring-yellow-400/50" : "bg-[#F59E0B]/55 ring-1 ring-amber-500/50"; // Soft yellow/amber last move highlight
+          bgClass = isLight ? theme.lastMoveLight : theme.lastMoveDark;
         } else if (isDangerVisionEnabled && isThreatened) {
-          bgClass = isLight ? "bg-red-100 border border-red-200" : "bg-red-200/95 border border-red-300";
+          bgClass = isLight ? theme.dangerLight : theme.dangerDark;
         }
 
         squares.push(
@@ -1148,7 +1237,7 @@ export default function App() {
             {/* Custom high-fidelity vector piece */}
             {piece && (
               <div className="w-[85%] h-[85%] transition-transform duration-200 hover:scale-105 active:scale-95 drop-shadow-md z-10">
-                <ChessPiece type={piece.type} color={piece.color} />
+                <ChessPiece type={piece.type} color={piece.color} pieceStyle={pieceStyle} />
               </div>
             )}
 
@@ -1162,7 +1251,7 @@ export default function App() {
                 className="absolute inset-0 flex items-center justify-center pointer-events-none z-30"
               >
                 <div className="w-[85%] h-[85%] drop-shadow-lg">
-                  <ChessPiece type={dp.type} color={dp.color} />
+                  <ChessPiece type={dp.type} color={dp.color} pieceStyle={pieceStyle} />
                 </div>
               </motion.div>
             ))}
@@ -1641,6 +1730,74 @@ export default function App() {
               </div>
             )}
           </div>
+
+          {/* Theme & Piece Switcher Panel */}
+          <div className="p-4 border-t border-slate-800 bg-[#070c16] shrink-0">
+            <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+              <Palette size={11} className="text-indigo-400" />
+              <span>Appearance & Themes</span>
+            </h2>
+            
+            {/* Board Color Sets */}
+            <div className="mb-3">
+              <label className="text-[9px] text-slate-400 block mb-1.5 font-bold uppercase tracking-wider">Board Theme</label>
+              <div className="grid grid-cols-4 gap-1 p-1 rounded-lg bg-slate-950 border border-slate-800/80">
+                {(Object.keys(BOARD_THEMES) as Array<keyof typeof BOARD_THEMES>).map((tId) => {
+                  const isSel = boardTheme === tId;
+                  const theme = BOARD_THEMES[tId];
+                  
+                  return (
+                    <button
+                      key={tId}
+                      onClick={() => setBoardTheme(tId)}
+                      title={theme.name}
+                      className={`relative flex flex-col items-center justify-center py-1.5 rounded-md cursor-pointer transition-all duration-150 ${
+                        isSel ? "bg-slate-800/80 text-white" : "hover:bg-slate-800/30 text-slate-400"
+                      }`}
+                    >
+                      {/* Dual Color Swatch */}
+                      <div className="w-5 h-5 rounded overflow-hidden flex rotate-45 border border-slate-700/60 shadow-sm mb-1">
+                        <div className={`w-1/2 h-full ${theme.lightSquare}`} />
+                        <div className={`w-1/2 h-full ${theme.darkSquare}`} />
+                      </div>
+                      <span className="text-[8px] font-bold truncate max-w-full px-0.5 leading-none">
+                        {tId.charAt(0).toUpperCase() + tId.slice(1)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Piece Style Selector */}
+            <div>
+              <label className="text-[9px] text-slate-400 block mb-1.5 font-bold uppercase tracking-wider">Piece Style</label>
+              <div className="grid grid-cols-3 gap-1 p-1 rounded-lg bg-slate-950 border border-slate-800/80">
+                {(["classic", "minimal", "abstract"] as const).map((styleId) => {
+                  const isSel = pieceStyle === styleId;
+                  
+                  // Display names for piece styles
+                  const styleNames = {
+                    classic: "Classic",
+                    minimal: "Silhouette",
+                    abstract: "Tokens",
+                  };
+                  
+                  return (
+                    <button
+                      key={styleId}
+                      onClick={() => setPieceStyle(styleId)}
+                      className={`py-1 text-[9px] font-bold rounded-md text-center cursor-pointer transition-all ${
+                        isSel ? "bg-indigo-600 text-white font-extrabold shadow-sm" : "text-slate-400 hover:text-slate-200"
+                      }`}
+                    >
+                      {styleNames[styleId]}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
         </aside>
 
         {/* ================= CENTER: ACTIVE BOARD OR TACTICAL PUZZLE ================= */}
@@ -1810,7 +1967,7 @@ export default function App() {
                           className="w-14 h-14 md:w-16 md:h-16 bg-[#1E293B] hover:bg-indigo-600 rounded-lg p-1.5 md:p-2 flex items-center justify-center transition-all border border-slate-700 shadow-md group"
                         >
                           <div className="w-[80%] h-[80%] group-hover:scale-110 transition-transform">
-                            <ChessPiece type={type} color={game.turn()} />
+                            <ChessPiece type={type} color={game.turn()} pieceStyle={pieceStyle} />
                           </div>
                         </button>
                       ))}
