@@ -1809,15 +1809,28 @@ export default function App() {
                   }
 
                   return (
-                    <button
+                    <div
                       key={g.id}
-                      disabled={isAiThinking}
-                      onClick={() => handleSelectSavedGame(g)}
-                      className={`w-full p-2.5 rounded border text-left transition-all cursor-pointer group block ${
+                      onClick={() => {
+                        if (!isAiThinking) {
+                          handleSelectSavedGame(g);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (!isAiThinking && (e.key === "Enter" || e.key === " ")) {
+                          e.preventDefault();
+                          handleSelectSavedGame(g);
+                        }
+                      }}
+                      role="button"
+                      tabIndex={isAiThinking ? -1 : 0}
+                      className={`w-full p-2.5 rounded border text-left transition-all group block ${
+                        isAiThinking ? "opacity-45 cursor-not-allowed" : "cursor-pointer"
+                      } ${
                         isSelected
                           ? "bg-indigo-600/10 border-indigo-500"
                           : "bg-slate-900 border-slate-800 hover:bg-slate-800/80"
-                      } disabled:opacity-45 disabled:cursor-not-allowed`}
+                      }`}
                     >
                       <div className="flex justify-between items-start text-xs">
                         <span className="font-bold text-slate-200">
@@ -1849,7 +1862,7 @@ export default function App() {
                           <Trash2 size={11} />
                         </button>
                       </div>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
