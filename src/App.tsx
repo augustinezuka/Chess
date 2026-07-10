@@ -232,6 +232,7 @@ export default function App() {
 
   // References
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastTickTimeRef = useRef<number>(0);
 
   // Save settings to localStorage when they change
   useEffect(() => {
@@ -336,11 +337,16 @@ export default function App() {
   // --- Countdown Clocks Effect ---
   useEffect(() => {
     if (timerState.isActive && !game.isGameOver() && timeControl !== "None") {
+      lastTickTimeRef.current = Date.now();
       timerIntervalRef.current = setInterval(() => {
+        const now = Date.now();
+        const delta = now - lastTickTimeRef.current;
+        lastTickTimeRef.current = now;
+
         setTimerState((prev) => {
           const isWhiteTurn = game.turn() === "w";
-          const newWhiteTime = isWhiteTurn ? Math.max(0, prev.whiteTime - 100) : prev.whiteTime;
-          const newBlackTime = !isWhiteTurn ? Math.max(0, prev.blackTime - 100) : prev.blackTime;
+          const newWhiteTime = isWhiteTurn ? Math.max(0, prev.whiteTime - delta) : prev.whiteTime;
+          const newBlackTime = !isWhiteTurn ? Math.max(0, prev.blackTime - delta) : prev.blackTime;
 
           let exceeded: ChessColor | null = null;
           if (newWhiteTime <= 0) {
@@ -1435,6 +1441,7 @@ export default function App() {
         <div className="flex items-center gap-1 md:gap-2">
           <button
             id="tab-play"
+            disabled={isAiThinking}
             onClick={() => {
               setActiveTab("play");
               setSelectedSavedGame(null);
@@ -1443,7 +1450,7 @@ export default function App() {
               activeTab === "play" && !selectedSavedGame
                 ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
                 : "text-slate-400 hover:bg-slate-800 hover:text-slate-200"
-            }`}
+            } disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             <Sparkles size={11} className="md:w-[13px] md:h-[13px]" />
             <span className="hidden xs:inline">Play Match</span>
@@ -1452,6 +1459,7 @@ export default function App() {
           
           <button
             id="tab-lessons"
+            disabled={isAiThinking}
             onClick={() => {
               setActiveTab("lessons");
               setSelectedSavedGame(null);
@@ -1463,7 +1471,7 @@ export default function App() {
               activeTab === "lessons"
                 ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
                 : "text-slate-400 hover:bg-slate-800 hover:text-slate-200"
-            }`}
+            } disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             <BookOpen size={11} className="md:w-[13px] md:h-[13px]" />
             <span className="hidden xs:inline">Tactics Trainer</span>
@@ -1472,6 +1480,7 @@ export default function App() {
 
           <button
             id="tab-openings"
+            disabled={isAiThinking}
             onClick={() => {
               setActiveTab("openings");
               setSelectedSavedGame(null);
@@ -1480,7 +1489,7 @@ export default function App() {
               activeTab === "openings"
                 ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
                 : "text-slate-400 hover:bg-slate-800 hover:text-slate-200"
-            }`}
+            } disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             <Compass size={11} className="md:w-[13px] md:h-[13px]" />
             <span className="hidden xs:inline">Opening Explorer</span>
@@ -1489,6 +1498,7 @@ export default function App() {
 
           <button
             id="tab-saved"
+            disabled={isAiThinking}
             onClick={() => {
               setActiveTab("saved");
               if (savedGames.length > 0 && !selectedSavedGame) {
@@ -1499,7 +1509,7 @@ export default function App() {
               activeTab === "saved" || selectedSavedGame
                 ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
                 : "text-slate-400 hover:bg-slate-800 hover:text-slate-200"
-            }`}
+            } disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             <Trophy size={11} className="md:w-[13px] md:h-[13px]" />
             <span className="hidden xs:inline">Replays</span>
@@ -1558,17 +1568,19 @@ export default function App() {
                 <div className="grid grid-cols-2 gap-1.5 bg-[#1E293B] p-1 rounded-lg border border-slate-700/50">
                   <button
                     onClick={() => setGameMode("ai")}
+                    disabled={isAiThinking}
                     className={`py-2.5 md:py-1.5 text-[11px] md:text-[10px] font-bold rounded-md text-center transition-all cursor-pointer ${
                       gameMode === "ai" ? "bg-indigo-600 text-white shadow" : "text-slate-400 hover:text-slate-200"
-                    }`}
+                    } disabled:opacity-40 disabled:cursor-not-allowed`}
                   >
                     VS AI
                   </button>
                   <button
                     onClick={() => setGameMode("local")}
+                    disabled={isAiThinking}
                     className={`py-2.5 md:py-1.5 text-[11px] md:text-[10px] font-bold rounded-md text-center transition-all cursor-pointer ${
                       gameMode === "local" ? "bg-indigo-600 text-white shadow" : "text-slate-400 hover:text-slate-200"
-                    }`}
+                    } disabled:opacity-40 disabled:cursor-not-allowed`}
                   >
                     Local PvP
                   </button>
@@ -1584,9 +1596,10 @@ export default function App() {
                       <button
                         key={level}
                         onClick={() => setDifficulty(level)}
+                        disabled={isAiThinking}
                         className={`py-2 md:py-1 text-[11px] md:text-[9.5px] font-extrabold rounded-md text-center transition-all cursor-pointer ${
                           difficulty === level ? "bg-indigo-600 text-white" : "text-slate-400 hover:text-slate-200"
-                        }`}
+                        } disabled:opacity-40 disabled:cursor-not-allowed`}
                       >
                         {level}
                       </button>
@@ -1600,8 +1613,9 @@ export default function App() {
                 <label className="text-[10px] text-slate-400 block mb-1.5 font-bold uppercase tracking-wider">Timer Limit</label>
                 <select
                   value={timeControl}
+                  disabled={isAiThinking}
                   onChange={(e) => setTimeControl(e.target.value)}
-                  className="w-full bg-[#1E293B] border border-slate-700/50 rounded-lg md:rounded-md py-2.5 md:py-1.5 px-3 md:px-2 text-xs md:text-[10px] font-semibold text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                  className="w-full bg-[#1E293B] border border-slate-700/50 rounded-lg md:rounded-md py-2.5 md:py-1.5 px-3 md:px-2 text-xs md:text-[10px] font-semibold text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <option value="3m">3 min (Bullet / Blitz)</option>
                   <option value="5m">5 min (Blitz)</option>
@@ -1618,13 +1632,15 @@ export default function App() {
                   <div className="grid grid-cols-3 gap-1.5 bg-[#1E293B] p-1 rounded-lg border border-slate-700/50">
                     <button
                       onClick={() => setPlayerColor("w")}
-                      className={`py-2 md:py-1 text-[11px] md:text-[9.5px] font-extrabold rounded-md cursor-pointer transition-all ${playerColor === "w" ? "bg-slate-200 text-slate-900 shadow" : "text-slate-400 hover:text-slate-200"}`}
+                      disabled={isAiThinking}
+                      className={`py-2 md:py-1 text-[11px] md:text-[9.5px] font-extrabold rounded-md cursor-pointer transition-all ${playerColor === "w" ? "bg-slate-200 text-slate-900 shadow" : "text-slate-400 hover:text-slate-200"} disabled:opacity-40 disabled:cursor-not-allowed`}
                     >
                       White
                     </button>
                     <button
                       onClick={() => setPlayerColor("b")}
-                      className={`py-2 md:py-1 text-[11px] md:text-[9.5px] font-extrabold rounded-md cursor-pointer transition-all ${playerColor === "b" ? "bg-slate-200 text-slate-900 shadow" : "text-slate-400 hover:text-slate-200"}`}
+                      disabled={isAiThinking}
+                      className={`py-2 md:py-1 text-[11px] md:text-[9.5px] font-extrabold rounded-md cursor-pointer transition-all ${playerColor === "b" ? "bg-slate-200 text-slate-900 shadow" : "text-slate-400 hover:text-slate-200"} disabled:opacity-40 disabled:cursor-not-allowed`}
                     >
                       Black
                     </button>
@@ -1633,7 +1649,8 @@ export default function App() {
                         const rColor = Math.random() < 0.5 ? "w" : "b";
                         setPlayerColor(rColor);
                       }}
-                      className="py-2 md:py-1 text-[11px] md:text-[9.5px] font-extrabold rounded-md cursor-pointer text-slate-400 hover:text-slate-200 transition-all"
+                      disabled={isAiThinking}
+                      className="py-2 md:py-1 text-[11px] md:text-[9.5px] font-extrabold rounded-md cursor-pointer text-slate-400 hover:text-slate-200 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       Random
                     </button>
@@ -1644,7 +1661,8 @@ export default function App() {
               {/* Apply & Restart */}
               <button
                 onClick={handleRestartMatch}
-                className="w-full py-3 md:py-2.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-xs md:text-[11px] font-extrabold rounded-lg md:rounded-md shadow transition-all uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer"
+                disabled={isAiThinking}
+                className="w-full py-3 md:py-2.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-xs md:text-[11px] font-extrabold rounded-lg md:rounded-md shadow transition-all uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <RefreshCw size={12} /> Start New Match
               </button>
@@ -1659,14 +1677,15 @@ export default function App() {
               </h2>
               <div className="space-y-1.5 max-h-[180px] overflow-y-auto pr-1">
                 {TACTICAL_LESSONS.map((lesson) => (
-                  <div
+                  <button
                     key={lesson.id}
+                    disabled={isAiThinking}
                     onClick={() => handleSelectLesson(lesson)}
-                    className={`p-2 rounded border cursor-pointer transition-all ${
+                    className={`w-full p-2 rounded border text-left cursor-pointer transition-all ${
                       selectedLesson?.id === lesson.id
                         ? "bg-indigo-600/10 border-indigo-500"
                         : "bg-slate-900/40 border-slate-800 hover:bg-slate-800/60"
-                    }`}
+                    } disabled:opacity-40 disabled:cursor-not-allowed`}
                   >
                     <div className="flex justify-between items-start">
                       <span className="text-[11px] font-bold text-slate-200 leading-tight">{lesson.title}</span>
@@ -1675,7 +1694,7 @@ export default function App() {
                       )}
                     </div>
                     <span className="text-[9px] text-indigo-400 font-bold block mt-0.5">{lesson.motif}</span>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
@@ -1693,8 +1712,9 @@ export default function App() {
                 <label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">Pawn Category</label>
                 <select
                   value={selectedOpeningCategory}
+                  disabled={isAiThinking}
                   onChange={(e) => setSelectedOpeningCategory(e.target.value)}
-                  className="w-full text-[10px] bg-slate-900 border border-slate-800 rounded p-1.5 text-slate-300 font-semibold focus:outline-none focus:border-indigo-500 cursor-pointer"
+                  className="w-full text-[10px] bg-slate-900 border border-slate-800 rounded p-1.5 text-slate-300 font-semibold focus:outline-none focus:border-indigo-500 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <option value="All">All Openings (50+)</option>
                   <option value="Open Games (1.e4 e5)">Open Games (1.e4 e5)</option>
@@ -1713,9 +1733,10 @@ export default function App() {
                 <input
                   type="text"
                   placeholder="Search openings & traps..."
+                  disabled={isAiThinking}
                   value={openingSearchQuery}
                   onChange={(e) => setOpeningSearchQuery(e.target.value)}
-                  className="w-full text-[10px] bg-slate-900 border border-slate-800 rounded pl-7 pr-3 py-1.5 text-slate-200 placeholder-slate-500 font-medium focus:outline-none focus:border-indigo-500"
+                  className="w-full text-[10px] bg-slate-900 border border-slate-800 rounded pl-7 pr-3 py-1.5 text-slate-200 placeholder-slate-500 font-medium focus:outline-none focus:border-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed"
                 />
                 <Search size={11} className="absolute left-2.5 top-2.5 text-slate-500" />
               </div>
@@ -1737,14 +1758,15 @@ export default function App() {
                   }
 
                   return filtered.map((op) => (
-                    <div
+                    <button
                       key={op.id}
+                      disabled={isAiThinking}
                       onClick={() => handleSelectOpening(op)}
-                      className={`p-2 rounded border text-left cursor-pointer transition-all ${
+                      className={`w-full p-2 rounded border text-left cursor-pointer transition-all block ${
                         selectedOpening?.id === op.id
                           ? "bg-indigo-600/20 border-indigo-500/80 shadow-sm"
                           : "bg-slate-900/40 border-slate-800 hover:bg-slate-850"
-                      }`}
+                      } disabled:opacity-40 disabled:cursor-not-allowed`}
                     >
                       <div className="flex justify-between items-start gap-1">
                         <span className="text-[10px] font-bold text-slate-200 leading-tight block truncate max-w-[130px]">{op.name}</span>
@@ -1753,7 +1775,7 @@ export default function App() {
                         </span>
                       </div>
                       <span className="text-[8px] text-slate-400 block mt-0.5 truncate">{op.category}</span>
-                    </div>
+                    </button>
                   ));
                 })()}
               </div>
@@ -1787,14 +1809,15 @@ export default function App() {
                   }
 
                   return (
-                    <div
+                    <button
                       key={g.id}
+                      disabled={isAiThinking}
                       onClick={() => handleSelectSavedGame(g)}
-                      className={`p-2.5 rounded border text-left transition-all cursor-pointer group ${
+                      className={`w-full p-2.5 rounded border text-left transition-all cursor-pointer group block ${
                         isSelected
                           ? "bg-indigo-600/10 border-indigo-500"
                           : "bg-slate-900 border-slate-800 hover:bg-slate-800/80"
-                      }`}
+                      } disabled:opacity-45 disabled:cursor-not-allowed`}
                     >
                       <div className="flex justify-between items-start text-xs">
                         <span className="font-bold text-slate-200">
@@ -1815,14 +1838,18 @@ export default function App() {
                       <div className="flex justify-between items-center mt-2 border-t border-slate-800/60 pt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                         <span className="text-[9px] text-indigo-400 font-bold hover:underline">Replay Game</span>
                         <button
-                          onClick={(e) => handleDeleteSavedGame(g.id, e)}
-                          className="text-slate-500 hover:text-red-400 p-0.5"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteSavedGame(g.id, e);
+                          }}
+                          disabled={isAiThinking}
+                          className="text-slate-500 hover:text-red-400 p-0.5 disabled:opacity-40 disabled:cursor-not-allowed"
                           title="Delete replay"
                         >
                           <Trash2 size={11} />
                         </button>
                       </div>
-                    </div>
+                    </button>
                   );
                 })}
               </div>
@@ -1847,11 +1874,12 @@ export default function App() {
                   return (
                     <button
                       key={tId}
+                      disabled={isAiThinking}
                       onClick={() => setBoardTheme(tId)}
                       title={theme.name}
                       className={`relative flex flex-col items-center justify-center py-1.5 rounded-md cursor-pointer transition-all duration-150 ${
                         isSel ? "bg-slate-800/80 text-white" : "hover:bg-slate-800/30 text-slate-400"
-                      }`}
+                      } disabled:opacity-40 disabled:cursor-not-allowed`}
                     >
                       {/* Dual Color Swatch */}
                       <div className="w-5 h-5 rounded overflow-hidden flex rotate-45 border border-slate-700/60 shadow-sm mb-1">
@@ -1887,10 +1915,11 @@ export default function App() {
                   return (
                     <button
                       key={styleId}
+                      disabled={isAiThinking}
                       onClick={() => setPieceStyle(styleId)}
                       className={`py-1 text-[8px] md:text-[9px] font-bold rounded-md text-center cursor-pointer transition-all ${
                         isSel ? "bg-indigo-600 text-white font-extrabold shadow-sm" : "text-slate-400 hover:text-slate-200"
-                      }`}
+                      } disabled:opacity-40 disabled:cursor-not-allowed`}
                     >
                       {styleNames[styleId]}
                     </button>
@@ -1943,11 +1972,12 @@ export default function App() {
           <div className="absolute top-4 right-4 flex gap-1.5 z-20 hidden md:flex animate-fadeIn">
             <button
               onClick={() => setIsDangerVisionEnabled(!isDangerVisionEnabled)}
+              disabled={isAiThinking}
               className={`px-3 py-1.5 rounded-md transition-all shadow border flex items-center gap-1.5 text-xs font-bold cursor-pointer ${
                 isDangerVisionEnabled
                   ? "bg-rose-600/95 text-white border-rose-500 hover:bg-rose-500 animate-pulse"
                   : "bg-[#1E293B]/80 text-slate-300 hover:text-white border-slate-700/50"
-              }`}
+              } disabled:opacity-40 disabled:cursor-not-allowed`}
               title="Toggle Danger Vision (Highlight threatened squares and pieces)"
             >
               <AlertTriangle size={13} className={isDangerVisionEnabled ? "animate-bounce" : ""} />
@@ -1956,7 +1986,8 @@ export default function App() {
 
             <button
               onClick={() => setIsBoardFlipped(!isBoardFlipped)}
-              className="p-1.5 bg-[#1E293B]/80 hover:bg-indigo-600 rounded-md text-slate-300 hover:text-white transition-all shadow border border-slate-700/50 cursor-pointer flex items-center justify-center"
+              disabled={isAiThinking}
+              className="p-1.5 bg-[#1E293B]/80 hover:bg-indigo-600 rounded-md text-slate-300 hover:text-white transition-all shadow border border-slate-700/50 cursor-pointer flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed"
               title="Flip Chessboard"
             >
               <TrendingUp size={14} className="transform rotate-45" />
@@ -1992,11 +2023,12 @@ export default function App() {
                   {/* Danger Vision button for mobile */}
                   <button
                     onClick={() => setIsDangerVisionEnabled(!isDangerVisionEnabled)}
+                    disabled={isAiThinking}
                     className={`md:hidden p-1.5 rounded-md transition-all border flex items-center justify-center gap-1 text-[10px] font-bold cursor-pointer ${
                       isDangerVisionEnabled
                         ? "bg-rose-600 text-white border-rose-500 animate-pulse"
                         : "bg-slate-800/80 text-slate-300 border-slate-700/50"
-                    }`}
+                    } disabled:opacity-40 disabled:cursor-not-allowed`}
                     title="Toggle Danger Vision"
                   >
                     <AlertTriangle size={11} />
@@ -2006,7 +2038,8 @@ export default function App() {
                   {/* Flip button for mobile */}
                   <button
                     onClick={() => setIsBoardFlipped(!isBoardFlipped)}
-                    className="md:hidden p-1.5 bg-slate-800/80 hover:bg-indigo-600 rounded-md text-slate-300 hover:text-white transition-all border border-slate-700/50 cursor-pointer"
+                    disabled={isAiThinking}
+                    className="md:hidden p-1.5 bg-slate-800/80 hover:bg-indigo-600 rounded-md text-slate-300 hover:text-white transition-all border border-slate-700/50 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                     title="Flip Chessboard"
                   >
                     <TrendingUp size={12} className="transform rotate-45" />
@@ -2043,7 +2076,8 @@ export default function App() {
                         handleSelectOpening(liveOp);
                         setActiveTab("openings");
                       }}
-                      className="text-[8px] text-indigo-300 hover:text-white font-black bg-indigo-900/40 border border-indigo-500/30 hover:bg-indigo-600 px-2 py-1 rounded transition-all shrink-0 uppercase tracking-wider cursor-pointer"
+                      disabled={isAiThinking}
+                      className="text-[8px] text-indigo-300 hover:text-white font-black bg-indigo-900/40 border border-indigo-500/30 hover:bg-indigo-600 px-2 py-1 rounded transition-all shrink-0 uppercase tracking-wider cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       Study Line
                     </button>
@@ -3123,7 +3157,7 @@ export default function App() {
                   }
                 }
               }}
-              disabled={moveHistory.length === 0}
+              disabled={isAiThinking || moveHistory.length === 0}
               className="flex flex-col items-center justify-center px-2 md:px-5 h-10 md:h-12 bg-[#2D3748] hover:bg-emerald-600 disabled:opacity-30 rounded-lg text-slate-200 hover:text-white transition-all border border-slate-700/60 cursor-pointer min-w-[48px] md:min-w-16 flex-shrink-0 active:scale-95 shadow-sm"
             >
               <Sparkles size={13} className="text-slate-300 hover:text-white md:w-[15px] md:h-[15px]" />
@@ -3135,16 +3169,16 @@ export default function App() {
             <button
               id="btn-offer-draw"
               onClick={handleOfferDraw}
-              disabled={game.isGameOver()}
-              className="px-2.5 md:px-6 h-10 md:h-12 bg-slate-800 hover:bg-slate-700 active:bg-slate-800 text-slate-200 hover:text-white font-extrabold rounded-lg text-[10px] md:text-xs border border-slate-700/60 shadow transition-all uppercase tracking-wider whitespace-nowrap flex-shrink-0 flex items-center justify-center cursor-pointer"
+              disabled={isAiThinking || game.isGameOver()}
+              className="px-2.5 md:px-6 h-10 md:h-12 bg-slate-800 hover:bg-slate-700 active:bg-slate-800 text-slate-200 hover:text-white font-extrabold rounded-lg text-[10px] md:text-xs border border-slate-700/60 shadow transition-all uppercase tracking-wider whitespace-nowrap flex-shrink-0 flex items-center justify-center cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
             >
               Offer Draw
             </button>
             <button
               id="btn-resign"
               onClick={handleResign}
-              disabled={game.isGameOver()}
-              className="px-2.5 md:px-6 h-10 md:h-12 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white font-extrabold rounded-lg text-[10px] md:text-xs border border-red-500/40 transition-all uppercase tracking-wider whitespace-nowrap flex-shrink-0 flex items-center justify-center cursor-pointer"
+              disabled={isAiThinking || game.isGameOver()}
+              className="px-2.5 md:px-6 h-10 md:h-12 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white font-extrabold rounded-lg text-[10px] md:text-xs border border-red-500/40 transition-all uppercase tracking-wider whitespace-nowrap flex-shrink-0 flex items-center justify-center cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
             >
               Resign
             </button>
@@ -3159,7 +3193,8 @@ export default function App() {
             <div className="flex-1"></div>
             <button
               onClick={handleResetLesson}
-              className="px-3 md:px-6 h-10 md:h-12 bg-[#1E293B] hover:bg-slate-700 text-slate-300 font-extrabold rounded-lg text-[10px] md:text-xs border border-slate-700 uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer flex items-center justify-center active:scale-95"
+              disabled={isAiThinking}
+              className="px-3 md:px-6 h-10 md:h-12 bg-[#1E293B] hover:bg-slate-700 text-slate-300 font-extrabold rounded-lg text-[10px] md:text-xs border border-slate-700 uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer flex items-center justify-center active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
             >
               Reset Lesson
             </button>
@@ -3169,7 +3204,8 @@ export default function App() {
                 const nextIndex = (currentIndex + 1) % TACTICAL_LESSONS.length;
                 handleSelectLesson(TACTICAL_LESSONS[nextIndex]);
               }}
-              className="px-3 md:px-6 h-10 md:h-12 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold rounded-lg text-[10px] md:text-xs shadow-lg uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer flex items-center justify-center active:scale-95"
+              disabled={isAiThinking}
+              className="px-3 md:px-6 h-10 md:h-12 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold rounded-lg text-[10px] md:text-xs shadow-lg uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer flex items-center justify-center active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
             >
               Next Motif
             </button>

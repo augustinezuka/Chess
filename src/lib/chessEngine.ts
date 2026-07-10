@@ -628,46 +628,18 @@ export function getBestMove(fen: string, difficulty: Difficulty): string {
     return moves[randomIndex];
   }
 
-  // --- Multi-Move Evaluation with Random Choice among top moves ---
-  const moveScores: { move: string; score: number }[] = [];
+  // --- Fast Single-Pass Iterative Deepening Search ---
   const memo = new Map<string, CacheEntry>();
+  let bestMove = moves[0];
 
-  for (const move of moves) {
-    try {
-      chess.move(move);
-      // Run search at targetDepth - 1 from the next position
-      const score = minimax(chess, targetDepth - 1, -Infinity, Infinity, !isMaximizing, memo).score;
-      chess.undo();
-      moveScores.push({ move, score });
-    } catch {
-      // Fallback
+  for (let d = 1; d <= targetDepth; d++) {
+    const result = minimax(chess, d, -Infinity, Infinity, isMaximizing, memo);
+    if (result.move) {
+      bestMove = result.move;
     }
   }
 
-  if (moveScores.length === 0) return moves[0];
-
-  // Sort moves based on active color maximizing/minimizing
-  if (isMaximizing) {
-    moveScores.sort((a, b) => b.score - a.score);
-  } else {
-    moveScores.sort((a, b) => a.score - b.score);
-  }
-
-  const bestScore = moveScores[0].score;
-  
-  // Collect all moves that are "very close" to the absolute best score (within 15 centipawns / 0.15 pawns)
-  // This breaks strict tie/ordering determinism and adds great human-like variance to mid-game choices!
-  const margin = 15;
-  const topMoves = moveScores.filter((ms) => {
-    if (isMaximizing) {
-      return ms.score >= bestScore - margin;
-    } else {
-      return ms.score <= bestScore + margin;
-    }
-  });
-
-  const chosen = topMoves[Math.floor(Math.random() * topMoves.length)];
-  return chosen.move;
+  return bestMove;
 }
 
 /**
