@@ -615,10 +615,10 @@ export function getBestMove(fen: string, difficulty: Difficulty): string {
     return bestMove;
   }
 
-  // - Hard: Iterative deepening up to depth 4 + quiescence, master-level tactical & positional look-ahead
+  // - Hard: Iterative deepening up to depth 3 + quiescence, master-level tactical & positional look-ahead
   const memo = new Map<string, CacheEntry>();
   let bestMove = moves[0];
-  for (let d = 1; d <= 4; d++) {
+  for (let d = 1; d <= 3; d++) {
     const result = minimax(chess, d, -Infinity, Infinity, isMaximizing, memo);
     if (result.move) {
       bestMove = result.move;

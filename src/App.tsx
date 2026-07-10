@@ -70,15 +70,50 @@ export default function App() {
 
 
   // Game Settings State
-  const [gameMode, setGameMode] = useState<GameMode>("ai");
-  const [difficulty, setDifficulty] = useState<Difficulty>("Medium");
-  const [playerColor, setPlayerColor] = useState<ChessColor>("w");
-  const [timeControl, setTimeControl] = useState<string>("10m"); // Options: "3m", "5m", "10m", "15m + 10s", "None"
+  const [gameMode, setGameMode] = useState<GameMode>(() => {
+    try {
+      const saved = localStorage.getItem("chess_trainer_game_mode");
+      return (saved as GameMode) || "ai";
+    } catch {
+      return "ai";
+    }
+  });
+  const [difficulty, setDifficulty] = useState<Difficulty>(() => {
+    try {
+      const saved = localStorage.getItem("chess_trainer_difficulty");
+      return (saved as Difficulty) || "Medium";
+    } catch {
+      return "Medium";
+    }
+  });
+  const [playerColor, setPlayerColor] = useState<ChessColor>(() => {
+    try {
+      const saved = localStorage.getItem("chess_trainer_player_color");
+      return (saved as ChessColor) || "w";
+    } catch {
+      return "w";
+    }
+  });
+  const [timeControl, setTimeControl] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem("chess_trainer_time_control");
+      return saved || "10m";
+    } catch {
+      return "10m";
+    }
+  });
 
   // Game Engine & Board State
   const [game, setGame] = useState(() => new Chess());
   const [fen, setFen] = useState(game.fen());
-  const [isBoardFlipped, setIsBoardFlipped] = useState(false);
+  const [isBoardFlipped, setIsBoardFlipped] = useState(() => {
+    try {
+      const saved = localStorage.getItem("chess_trainer_board_flipped");
+      return saved === "true";
+    } catch {
+      return false;
+    }
+  });
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
   const [validDestinations, setValidDestinations] = useState<string[]>([]);
   const [promotionState, setPromotionState] = useState<{ from: string; to: string } | null>(null);
@@ -165,12 +200,68 @@ export default function App() {
   const [showGameOverOverlay, setShowGameOverOverlay] = useState(false);
 
   // Danger Vision & Special Rules Help Center
-  const [isDangerVisionEnabled, setIsDangerVisionEnabled] = useState(false);
+  const [isDangerVisionEnabled, setIsDangerVisionEnabled] = useState(() => {
+    try {
+      const saved = localStorage.getItem("chess_trainer_danger_vision");
+      return saved === "true";
+    } catch {
+      return false;
+    }
+  });
   const [selectedRulesTab, setSelectedRulesTab] = useState<"castling" | "enpassant" | "promotion">("castling");
   const [isRulesPanelExpanded, setIsRulesPanelExpanded] = useState(true);
 
   // References
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Save settings to localStorage when they change
+  useEffect(() => {
+    try {
+      localStorage.setItem("chess_trainer_game_mode", gameMode);
+    } catch (e) {
+      console.error(e);
+    }
+  }, [gameMode]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("chess_trainer_difficulty", difficulty);
+    } catch (e) {
+      console.error(e);
+    }
+  }, [difficulty]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("chess_trainer_player_color", playerColor);
+    } catch (e) {
+      console.error(e);
+    }
+  }, [playerColor]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("chess_trainer_time_control", timeControl);
+    } catch (e) {
+      console.error(e);
+    }
+  }, [timeControl]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("chess_trainer_board_flipped", String(isBoardFlipped));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [isBoardFlipped]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("chess_trainer_danger_vision", String(isDangerVisionEnabled));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [isDangerVisionEnabled]);
 
   // --- Initial Mount & LocalStorage loading ---
   useEffect(() => {
@@ -965,6 +1056,10 @@ export default function App() {
 
     const squares = [];
 
+    // Get last move played on this board to highlight
+    const boardHistory = chessInstance.history({ verbose: true }) as any[];
+    const lastMove = boardHistory.length > 0 ? boardHistory[boardHistory.length - 1] : null;
+
     // Find if king is in check to draw warning ring
     const turnColor = chessInstance.turn();
     const isCheck = chessInstance.inCheck();
@@ -1023,6 +1118,10 @@ export default function App() {
         const isThreatened = threatenedSquares.includes(sqName);
         const isMyPiece = piece && piece.color === turnColor;
 
+        const isLastMoveFrom = lastMove && lastMove.from === sqName;
+        const isLastMoveTo = lastMove && lastMove.to === sqName;
+        const isLastMove = isLastMoveFrom || isLastMoveTo;
+
         let bgClass = isLight ? "bg-[#E2E8F0]" : "bg-[#94A3B8]"; // Warm off-white & cool gray-blue
 
         if (isSelected) {
@@ -1031,6 +1130,8 @@ export default function App() {
           bgClass = isLight ? "bg-[#C7D2FE]" : "bg-[#818CF8]"; // light indigo highlights
         } else if (isKingInCheck) {
           bgClass = "bg-red-400 animate-pulse";
+        } else if (isLastMove) {
+          bgClass = isLight ? "bg-[#FDE047]/65 ring-1 ring-yellow-400/50" : "bg-[#F59E0B]/55 ring-1 ring-amber-500/50"; // Soft yellow/amber last move highlight
         } else if (isDangerVisionEnabled && isThreatened) {
           bgClass = isLight ? "bg-red-100 border border-red-200" : "bg-red-200/95 border border-red-300";
         }
