@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Chess } from "chess.js";
 import { ChessPiece } from "./components/ChessPiece";
+import { motion } from "motion/react";
 import { getBestMove, evaluateMoveQuality } from "./lib/chessEngine";
 import { TACTICAL_LESSONS } from "./data/tacticalLessons";
 import { CHESS_OPENINGS, detectOpening } from "./data/chessOpenings";
@@ -81,6 +82,34 @@ export default function App() {
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
   const [validDestinations, setValidDestinations] = useState<string[]>([]);
   const [promotionState, setPromotionState] = useState<{ from: string; to: string } | null>(null);
+
+  // Animated captured pieces state
+  interface DyingPiece {
+    id: string;
+    square: string;
+    type: string;
+    color: "w" | "b";
+  }
+  const [dyingPieces, setDyingPieces] = useState<DyingPiece[]>([]);
+
+  const addDyingPieceIfCaptured = (moveResult: any) => {
+    if (moveResult && moveResult.captured) {
+      let capturedSquare = moveResult.to;
+      if (moveResult.flags && moveResult.flags.includes("e")) {
+        capturedSquare = moveResult.to[0] + moveResult.from[1];
+      }
+      const newDyingPiece: DyingPiece = {
+        id: `${capturedSquare}-${Date.now()}-${Math.random()}`,
+        square: capturedSquare,
+        type: moveResult.captured,
+        color: moveResult.color === "w" ? "b" : "w",
+      };
+      setDyingPieces((prev) => [...prev, newDyingPiece]);
+      setTimeout(() => {
+        setDyingPieces((prev) => prev.filter((p) => p.id !== newDyingPiece.id));
+      }, 600);
+    }
+  };
 
   // Active Move History log for the sidebar
   const [moveHistory, setMoveHistory] = useState<MoveRecord[]>([]);
@@ -275,6 +304,7 @@ export default function App() {
             const resultMove = game.move(bestMoveSan);
 
             if (resultMove) {
+              addDyingPieceIfCaptured(resultMove);
               setFen(game.fen());
               handleMoveIncrement(turnBefore);
               updateMoveLogs(resultMove);
@@ -448,6 +478,7 @@ export default function App() {
     try {
       const moveResult = game.move({ from, to, promotion });
       if (moveResult) {
+        addDyingPieceIfCaptured(moveResult);
         setFen(game.fen());
         setSelectedSquare(null);
         setValidDestinations([]);
@@ -733,7 +764,8 @@ export default function App() {
           testBoard.move(playedSan);
           // Check if matches target
           if (playedSan.toLowerCase() === selectedLesson?.targetMove.toLowerCase()) {
-            lessonBoard.move(playedSan);
+            const moveResult = lessonBoard.move(playedSan);
+            addDyingPieceIfCaptured(moveResult);
             setLessonFen(lessonBoard.fen());
             setLessonStatus("solved");
             setLessonFeedback("Correct! You found the winning tactical combination.");
@@ -957,6 +989,7 @@ export default function App() {
         if (!copy.isGameOver()) {
           const fenParts = copy.fen().split(" ");
           fenParts[1] = fenParts[1] === "w" ? "b" : "w";
+          fenParts[3] = "-"; // Clear en-passant square to prevent 'illegal en-passant square' validation issues on turn switch
           const opponentBoard = new Chess(fenParts.join(" "));
           const opponentMoves = opponentBoard.moves({ verbose: true }) as any[];
           threatenedSquares = opponentMoves.map((m) => m.to);
@@ -1017,6 +1050,21 @@ export default function App() {
                 <ChessPiece type={piece.type} color={piece.color} />
               </div>
             )}
+
+            {/* Dying (captured) piece animation overlay */}
+            {dyingPieces.filter((dp) => dp.square === sqName).map((dp) => (
+              <motion.div
+                key={dp.id}
+                initial={{ scale: 1.1, opacity: 1, y: 0, rotate: 0 }}
+                animate={{ scale: 0, opacity: 0, y: -45, rotate: 20 }}
+                transition={{ duration: 0.55, ease: "easeInOut" }}
+                className="absolute inset-0 flex items-center justify-center pointer-events-none z-30"
+              >
+                <div className="w-[85%] h-[85%] drop-shadow-lg">
+                  <ChessPiece type={dp.type} color={dp.color} />
+                </div>
+              </motion.div>
+            ))}
 
             {/* Danger Vision alert badges for user pieces under active threat */}
             {isDangerVisionEnabled && isThreatened && isMyPiece && (
@@ -1203,9 +1251,9 @@ export default function App() {
             <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Match Settings & History</span>
             <button
               onClick={() => setIsLeftSidebarOpen(false)}
-              className="text-slate-400 hover:text-slate-200 transition-colors p-1"
+              className="text-slate-400 hover:text-slate-200 transition-colors p-1.5 active:scale-95"
             >
-              <XCircle size={18} />
+              <XCircle size={22} />
             </button>
           </div>
           
@@ -1218,11 +1266,11 @@ export default function App() {
               
               {/* Game Mode Picker */}
               <div>
-                <label className="text-[10px] text-slate-400 block mb-1">Game Mode</label>
-                <div className="grid grid-cols-2 gap-1 bg-[#1E293B] p-0.5 rounded-md border border-slate-700/50">
+                <label className="text-[10px] text-slate-400 block mb-1.5 font-bold uppercase tracking-wider">Game Mode</label>
+                <div className="grid grid-cols-2 gap-1.5 bg-[#1E293B] p-1 rounded-lg border border-slate-700/50">
                   <button
                     onClick={() => setGameMode("ai")}
-                    className={`py-1 text-[10px] font-bold rounded text-center transition-all ${
+                    className={`py-2.5 md:py-1.5 text-[11px] md:text-[10px] font-bold rounded-md text-center transition-all cursor-pointer ${
                       gameMode === "ai" ? "bg-indigo-600 text-white shadow" : "text-slate-400 hover:text-slate-200"
                     }`}
                   >
@@ -1230,7 +1278,7 @@ export default function App() {
                   </button>
                   <button
                     onClick={() => setGameMode("local")}
-                    className={`py-1 text-[10px] font-bold rounded text-center transition-all ${
+                    className={`py-2.5 md:py-1.5 text-[11px] md:text-[10px] font-bold rounded-md text-center transition-all cursor-pointer ${
                       gameMode === "local" ? "bg-indigo-600 text-white shadow" : "text-slate-400 hover:text-slate-200"
                     }`}
                   >
@@ -1242,13 +1290,13 @@ export default function App() {
               {/* AI Difficulty (only if AI mode) */}
               {gameMode === "ai" && (
                 <div>
-                  <label className="text-[10px] text-slate-400 block mb-1">AI Coach Difficulty</label>
-                  <div className="grid grid-cols-3 gap-1 bg-[#1E293B] p-0.5 rounded-md border border-slate-700/50">
+                  <label className="text-[10px] text-slate-400 block mb-1.5 font-bold uppercase tracking-wider">AI Coach Difficulty</label>
+                  <div className="grid grid-cols-3 gap-1.5 bg-[#1E293B] p-1 rounded-lg border border-slate-700/50">
                     {(["Easy", "Medium", "Hard"] as Difficulty[]).map((level) => (
                       <button
                         key={level}
                         onClick={() => setDifficulty(level)}
-                        className={`py-0.5 text-[9px] font-extrabold rounded text-center transition-all ${
+                        className={`py-2 md:py-1 text-[11px] md:text-[9.5px] font-extrabold rounded-md text-center transition-all cursor-pointer ${
                           difficulty === level ? "bg-indigo-600 text-white" : "text-slate-400 hover:text-slate-200"
                         }`}
                       >
@@ -1261,11 +1309,11 @@ export default function App() {
 
               {/* Timer selection */}
               <div>
-                <label className="text-[10px] text-slate-400 block mb-1">Timer Limit</label>
+                <label className="text-[10px] text-slate-400 block mb-1.5 font-bold uppercase tracking-wider">Timer Limit</label>
                 <select
                   value={timeControl}
                   onChange={(e) => setTimeControl(e.target.value)}
-                  className="w-full bg-[#1E293B] border border-slate-700/50 rounded-md py-1 px-2 text-[10px] font-medium text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="w-full bg-[#1E293B] border border-slate-700/50 rounded-lg md:rounded-md py-2.5 md:py-1.5 px-3 md:px-2 text-xs md:text-[10px] font-semibold text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
                 >
                   <option value="3m">3 min (Bullet / Blitz)</option>
                   <option value="5m">5 min (Blitz)</option>
@@ -1278,17 +1326,17 @@ export default function App() {
               {/* AI Color Select */}
               {gameMode === "ai" && (
                 <div>
-                  <label className="text-[10px] text-slate-400 block mb-1">Your Color</label>
-                  <div className="grid grid-cols-3 gap-1 bg-[#1E293B] p-0.5 rounded-md border border-slate-700/50">
+                  <label className="text-[10px] text-slate-400 block mb-1.5 font-bold uppercase tracking-wider">Your Color</label>
+                  <div className="grid grid-cols-3 gap-1.5 bg-[#1E293B] p-1 rounded-lg border border-slate-700/50">
                     <button
                       onClick={() => setPlayerColor("w")}
-                      className={`py-0.5 text-[9px] font-bold rounded ${playerColor === "w" ? "bg-slate-200 text-slate-900" : "text-slate-400"}`}
+                      className={`py-2 md:py-1 text-[11px] md:text-[9.5px] font-extrabold rounded-md cursor-pointer transition-all ${playerColor === "w" ? "bg-slate-200 text-slate-900 shadow" : "text-slate-400 hover:text-slate-200"}`}
                     >
                       White
                     </button>
                     <button
                       onClick={() => setPlayerColor("b")}
-                      className={`py-0.5 text-[9px] font-bold rounded ${playerColor === "b" ? "bg-slate-200 text-slate-900" : "text-slate-400"}`}
+                      className={`py-2 md:py-1 text-[11px] md:text-[9.5px] font-extrabold rounded-md cursor-pointer transition-all ${playerColor === "b" ? "bg-slate-200 text-slate-900 shadow" : "text-slate-400 hover:text-slate-200"}`}
                     >
                       Black
                     </button>
@@ -1297,7 +1345,7 @@ export default function App() {
                         const rColor = Math.random() < 0.5 ? "w" : "b";
                         setPlayerColor(rColor);
                       }}
-                      className="py-0.5 text-[9px] font-bold rounded text-slate-400 hover:text-slate-200"
+                      className="py-2 md:py-1 text-[11px] md:text-[9.5px] font-extrabold rounded-md cursor-pointer text-slate-400 hover:text-slate-200 transition-all"
                     >
                       Random
                     </button>
@@ -1308,9 +1356,9 @@ export default function App() {
               {/* Apply & Restart */}
               <button
                 onClick={handleRestartMatch}
-                className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold rounded shadow transition-all uppercase tracking-wider flex items-center justify-center gap-1"
+                className="w-full py-3 md:py-2.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-xs md:text-[11px] font-extrabold rounded-lg md:rounded-md shadow transition-all uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                <RefreshCw size={11} /> Start New Match
+                <RefreshCw size={12} /> Start New Match
               </button>
             </div>
           )}
@@ -2179,9 +2227,9 @@ export default function App() {
             <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">AI Coach & Analysis</span>
             <button
               onClick={() => setIsRightSidebarOpen(false)}
-              className="text-slate-400 hover:text-slate-200 transition-colors p-1"
+              className="text-slate-400 hover:text-slate-200 transition-colors p-1.5 active:scale-95"
             >
-              <XCircle size={18} />
+              <XCircle size={22} />
             </button>
           </div>
           
@@ -2680,27 +2728,27 @@ export default function App() {
       </main>
 
       {/* Footer Navigation / Control Bar */}
-      <footer id="app-footer" className="h-16 md:h-[70px] bg-[#1E293B] border-t border-slate-800 flex items-center px-3 md:px-6 gap-2 md:gap-4 shrink-0 select-none overflow-x-auto md:overflow-visible">
+      <footer id="app-footer" className="h-14 md:h-[70px] bg-[#1E293B] border-t border-slate-800 flex items-center px-2 md:px-6 gap-1.5 md:gap-4 shrink-0 select-none overflow-x-auto md:overflow-visible">
         {activeTab === "play" && (
           <>
             <button
               id="btn-undo"
               onClick={handleUndo}
               disabled={isAiThinking || moveHistory.length === 0}
-              className="flex flex-col items-center justify-center px-3 md:px-5 h-11 md:h-12 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded text-slate-300 transition-colors border border-slate-700/50 cursor-pointer min-w-[50px] md:min-w-16 flex-shrink-0"
+              className="flex flex-col items-center justify-center px-2 md:px-5 h-10 md:h-12 bg-[#2D3748] hover:bg-slate-700 disabled:opacity-30 rounded-lg text-slate-200 transition-all border border-slate-700/60 cursor-pointer min-w-[48px] md:min-w-16 flex-shrink-0 active:scale-95 shadow-sm"
             >
-              <Undo2 size={13} className="md:w-[15px] md:h-[15px]" />
-              <span className="text-[8px] md:text-[9px] uppercase font-bold mt-1">Undo</span>
+              <Undo2 size={13} className="text-slate-300 md:w-[15px] md:h-[15px]" />
+              <span className="text-[8.5px] md:text-[10px] uppercase font-bold tracking-wider mt-0.5">Undo</span>
             </button>
             
             <button
               id="btn-hint"
               onClick={handleRequestHint}
               disabled={isAiThinking || game.isGameOver()}
-              className="flex flex-col items-center justify-center px-3 md:px-5 h-11 md:h-12 bg-slate-800 hover:bg-indigo-600 disabled:opacity-30 rounded text-slate-300 hover:text-white transition-colors border border-slate-700/50 cursor-pointer min-w-[50px] md:min-w-16 flex-shrink-0"
+              className="flex flex-col items-center justify-center px-2 md:px-5 h-10 md:h-12 bg-[#2D3748] hover:bg-indigo-600 disabled:opacity-30 rounded-lg text-slate-200 hover:text-white transition-all border border-slate-700/60 cursor-pointer min-w-[48px] md:min-w-16 flex-shrink-0 active:scale-95 shadow-sm"
             >
-              <HelpCircle size={13} className="md:w-[15px] md:h-[15px]" />
-              <span className="text-[8px] md:text-[9px] uppercase font-bold mt-1">Hint</span>
+              <HelpCircle size={13} className="text-slate-300 hover:text-white md:w-[15px] md:h-[15px]" />
+              <span className="text-[8.5px] md:text-[10px] uppercase font-bold tracking-wider mt-0.5">Hint</span>
             </button>
             
             <button
@@ -2716,10 +2764,10 @@ export default function App() {
                 }
               }}
               disabled={moveHistory.length === 0}
-              className="flex flex-col items-center justify-center px-3 md:px-5 h-11 md:h-12 bg-slate-800 hover:bg-emerald-600 disabled:opacity-30 rounded text-slate-300 hover:text-white transition-all border border-slate-700/50 cursor-pointer min-w-[50px] md:min-w-16 flex-shrink-0"
+              className="flex flex-col items-center justify-center px-2 md:px-5 h-10 md:h-12 bg-[#2D3748] hover:bg-emerald-600 disabled:opacity-30 rounded-lg text-slate-200 hover:text-white transition-all border border-slate-700/60 cursor-pointer min-w-[48px] md:min-w-16 flex-shrink-0 active:scale-95 shadow-sm"
             >
-              <Sparkles size={13} className="md:w-[15px] md:h-[15px]" />
-              <span className="text-[8px] md:text-[9px] uppercase font-bold mt-1">Analysis</span>
+              <Sparkles size={13} className="text-slate-300 hover:text-white md:w-[15px] md:h-[15px]" />
+              <span className="text-[8.5px] md:text-[10px] uppercase font-bold tracking-wider mt-0.5">Analysis</span>
             </button>
 
             <div className="flex-1 md:block hidden"></div>
@@ -2728,7 +2776,7 @@ export default function App() {
               id="btn-offer-draw"
               onClick={handleOfferDraw}
               disabled={game.isGameOver()}
-              className="px-3 md:px-6 py-2 md:py-2.5 bg-[#1E293B] hover:bg-slate-700 text-slate-300 hover:text-white font-bold rounded text-[10px] md:text-xs border border-slate-700 shadow transition-all uppercase tracking-wider whitespace-nowrap flex-shrink-0"
+              className="px-2.5 md:px-6 h-10 md:h-12 bg-slate-800 hover:bg-slate-700 active:bg-slate-800 text-slate-200 hover:text-white font-extrabold rounded-lg text-[10px] md:text-xs border border-slate-700/60 shadow transition-all uppercase tracking-wider whitespace-nowrap flex-shrink-0 flex items-center justify-center cursor-pointer"
             >
               Offer Draw
             </button>
@@ -2736,7 +2784,7 @@ export default function App() {
               id="btn-resign"
               onClick={handleResign}
               disabled={game.isGameOver()}
-              className="px-3 md:px-6 py-2 md:py-2.5 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white font-bold rounded text-[10px] md:text-xs border border-red-500/30 transition-all uppercase tracking-wider whitespace-nowrap flex-shrink-0"
+              className="px-2.5 md:px-6 h-10 md:h-12 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white font-extrabold rounded-lg text-[10px] md:text-xs border border-red-500/40 transition-all uppercase tracking-wider whitespace-nowrap flex-shrink-0 flex items-center justify-center cursor-pointer"
             >
               Resign
             </button>
@@ -2751,7 +2799,7 @@ export default function App() {
             <div className="flex-1"></div>
             <button
               onClick={handleResetLesson}
-              className="px-4 md:px-6 py-2 md:py-2.5 bg-[#1E293B] hover:bg-slate-700 text-slate-300 font-bold rounded text-[10px] md:text-xs border border-slate-700 uppercase tracking-wider whitespace-nowrap"
+              className="px-3 md:px-6 h-10 md:h-12 bg-[#1E293B] hover:bg-slate-700 text-slate-300 font-extrabold rounded-lg text-[10px] md:text-xs border border-slate-700 uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer flex items-center justify-center active:scale-95"
             >
               Reset Lesson
             </button>
@@ -2761,7 +2809,7 @@ export default function App() {
                 const nextIndex = (currentIndex + 1) % TACTICAL_LESSONS.length;
                 handleSelectLesson(TACTICAL_LESSONS[nextIndex]);
               }}
-              className="px-4 md:px-6 py-2 md:py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded text-[10px] md:text-xs shadow-lg uppercase tracking-wider whitespace-nowrap"
+              className="px-3 md:px-6 h-10 md:h-12 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold rounded-lg text-[10px] md:text-xs shadow-lg uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer flex items-center justify-center active:scale-95"
             >
               Next Motif
             </button>
@@ -2779,7 +2827,7 @@ export default function App() {
                 setActiveTab("play");
                 setSelectedSavedGame(null);
               }}
-              className="px-4 md:px-6 py-2 md:py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded text-[10px] md:text-xs shadow-lg uppercase tracking-wider whitespace-nowrap"
+              className="px-3 md:px-6 h-10 md:h-12 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold rounded-lg text-[10px] md:text-xs shadow-lg uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer flex items-center justify-center active:scale-95"
             >
               Back to Active Play
             </button>
