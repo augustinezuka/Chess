@@ -5,6 +5,7 @@ import { motion } from "motion/react";
 import { getBestMove, evaluateMoveQuality } from "./lib/chessEngine";
 import { TACTICAL_LESSONS } from "./data/tacticalLessons";
 import { CHESS_OPENINGS, detectOpening } from "./data/chessOpenings";
+import { playChessSound, SoundPack } from "./lib/sounds";
 import {
   Play,
   Pause,
@@ -30,7 +31,8 @@ import {
   TrendingUp,
   Award,
   Compass,
-  Palette
+  Palette,
+  Zap
 } from "lucide-react";
 import {
   GameMode,
@@ -104,7 +106,7 @@ export default function App() {
     }
   });
 
-  const [boardTheme, setBoardTheme] = useState<"slate" | "wood" | "emerald" | "midnight" | "ocean" | "crimson" | "desert" | "cyberpunk" | "forest" | "arctic" | "vintage" | "royal">(() => {
+  const [boardTheme, setBoardTheme] = useState<"slate" | "wood" | "emerald" | "midnight" | "ocean" | "crimson" | "desert" | "cyberpunk" | "forest" | "arctic" | "vintage" | "royal" | "amethyst" | "halloween" | "sakura" | "grayscale" | "retro" | "chocolate" | "inferno" | "abyss" | "bubblegum" | "bronze">(() => {
     try {
       const saved = localStorage.getItem("chess_trainer_board_theme");
       return (saved as any) || "slate";
@@ -113,7 +115,7 @@ export default function App() {
     }
   });
 
-  const [pieceStyle, setPieceStyle] = useState<"classic" | "minimal" | "abstract" | "neon" | "royal" | "nature">(() => {
+  const [pieceStyle, setPieceStyle] = useState<"classic" | "minimal" | "abstract" | "neon" | "royal" | "nature" | "glass" | "gothic" | "shadow" | "retro8bit" | "space" | "aurora" | "steampunk" | "origami" | "cartoon">(() => {
     try {
       const saved = localStorage.getItem("chess_trainer_piece_style");
       return (saved as any) || "classic";
@@ -230,6 +232,55 @@ export default function App() {
   const [selectedRulesTab, setSelectedRulesTab] = useState<"castling" | "enpassant" | "promotion">("castling");
   const [isRulesPanelExpanded, setIsRulesPanelExpanded] = useState(true);
 
+  // --- Brand New Premium Features State ---
+  const [isSoundEnabled, setIsSoundEnabled] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem("chess_trainer_sound_enabled");
+      return saved !== "false"; // default to true
+    } catch {
+      return true;
+    }
+  });
+
+  const [soundPack, setSoundPack] = useState<SoundPack>(() => {
+    try {
+      const saved = localStorage.getItem("chess_trainer_sound_pack");
+      return (saved as SoundPack) || "wood";
+    } catch {
+      return "wood";
+    }
+  });
+
+  const [boardCoordinatesStyle, setBoardCoordinatesStyle] = useState<"inset" | "bright" | "hidden">(() => {
+    try {
+      const saved = localStorage.getItem("chess_trainer_coordinates_style");
+      return (saved as any) || "inset";
+    } catch {
+      return "inset";
+    }
+  });
+
+  const [floatingMoveBadge, setFloatingMoveBadge] = useState<{ text: string; type: string; square: string } | null>(null);
+
+  // Puzzle Rush (Speed Tactics) Mode States
+  const [isPuzzleRushActive, setIsPuzzleRushActive] = useState<boolean>(false);
+  const [puzzleRushStatus, setPuzzleRushStatus] = useState<"idle" | "playing" | "ended">("idle");
+  const [puzzleRushScore, setPuzzleRushScore] = useState<number>(0);
+  const [puzzleRushTimeRemaining, setPuzzleRushTimeRemaining] = useState<number>(60);
+  const [puzzleRushCorrectCount, setPuzzleRushCorrectCount] = useState<number>(0);
+  const [puzzleRushIncorrectCount, setPuzzleRushIncorrectCount] = useState<number>(0);
+  const [puzzleRushFeedback, setPuzzleRushFeedback] = useState<{ correct: boolean; text: string } | null>(null);
+  const [puzzleRushHighScore, setPuzzleRushHighScore] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem("chess_trainer_puzzle_rush_high_score");
+      return saved ? parseInt(saved, 10) : 0;
+    } catch {
+      return 0;
+    }
+  });
+  const [puzzleRushLessonIndex, setPuzzleRushLessonIndex] = useState<number>(0);
+  const puzzleRushTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   // References
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastTickTimeRef = useRef<number>(0);
@@ -298,6 +349,30 @@ export default function App() {
       console.error(e);
     }
   }, [pieceStyle]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("chess_trainer_sound_enabled", String(isSoundEnabled));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [isSoundEnabled]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("chess_trainer_sound_pack", soundPack);
+    } catch (e) {
+      console.error(e);
+    }
+  }, [soundPack]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("chess_trainer_coordinates_style", boardCoordinatesStyle);
+    } catch (e) {
+      console.error(e);
+    }
+  }, [boardCoordinatesStyle]);
 
   // --- Initial Mount & LocalStorage loading ---
   useEffect(() => {
@@ -439,7 +514,7 @@ export default function App() {
               addDyingPieceIfCaptured(resultMove);
               setFen(game.fen());
               handleMoveIncrement(turnBefore);
-              updateMoveLogs(resultMove);
+              updateMoveLogs(resultMove, fenBefore, turnBefore);
               calculateAdvantage(game);
 
               // Evaluate if the AI made a mistake (unlikely on Hard, possible on Medium/Easy)
@@ -475,8 +550,37 @@ export default function App() {
     setAdvantageVal(Number(score.toFixed(1)));
   };
 
-  // --- Move logging and updating ---
-  const updateMoveLogs = (move: any) => {
+  // --- Move logging and updating with grades, sounds and badges ---
+  const updateMoveLogs = (move: any, fenBefore: string, turnBefore: ChessColor) => {
+    let grade: MoveRecord["grade"] = "good";
+    const flags = move.flags || "";
+
+    // 1. Determine base grade events
+    if (move.san && (move.san.includes("+") || move.san.includes("#"))) {
+      grade = "check";
+    } else if (flags.includes("p")) {
+      grade = "promotion";
+    } else if (flags.includes("k") || flags.includes("q")) {
+      grade = "castle";
+    } else if (move.captured) {
+      grade = "capture";
+    }
+
+    // 2. Perform deep evaluation drop checking
+    const qualityEval = evaluateMoveQuality(fenBefore, move.san, turnBefore);
+    if (qualityEval.isMistake) {
+      grade = "mistake";
+    } else {
+      // Check if it matches an Opening Book line prefix
+      const currentSanHistory = [...moveHistory.map((m) => m.san), move.san];
+      const isBook = detectOpening(currentSanHistory) !== null;
+      if (isBook) {
+        grade = "book";
+      } else if (qualityEval.scoreDifference <= 10 && !move.captured) {
+        grade = "excellent";
+      }
+    }
+
     const moveRec: MoveRecord = {
       san: move.san,
       from: move.from,
@@ -485,8 +589,51 @@ export default function App() {
       color: move.color,
       captured: move.captured,
       promotion: move.promotion,
+      grade,
     };
     setMoveHistory((prev) => [...prev, moveRec]);
+
+    // 3. Trigger floating visual move grade badge
+    const gradeDisplayNames: Record<string, { text: string; type: string }> = {
+      book: { text: "Book Move 📖", type: "book" },
+      excellent: { text: "Excellent Move ✨", type: "excellent" },
+      check: { text: "Check! ⚡", type: "check" },
+      promotion: { text: "Promotion! 👑", type: "promotion" },
+      castle: { text: "Castling! 🏰", type: "castle" },
+      capture: { text: "Capture ⚔️", type: "capture" },
+      mistake: { text: "Mistake ⚠️", type: "mistake" },
+      good: { text: "Good Move 👍", type: "good" },
+    };
+
+    const badgeInfo = gradeDisplayNames[grade] || { text: "Good Move 👍", type: "good" };
+    setFloatingMoveBadge({
+      text: badgeInfo.text,
+      type: badgeInfo.type,
+      square: move.to,
+    });
+
+    // Auto-clear floating badge after 1.5s
+    setTimeout(() => {
+      setFloatingMoveBadge(null);
+    }, 1500);
+
+    // 4. Play synthesized chess sound pack
+    if (isSoundEnabled) {
+      const isOver = game.isGameOver();
+      if (isOver) {
+        playChessSound("gameover", soundPack);
+      } else if (flags.includes("p")) {
+        playChessSound("promotion", soundPack);
+      } else if (flags.includes("k") || flags.includes("q")) {
+        playChessSound("castle", soundPack);
+      } else if (move.san && (move.san.includes("+") || move.san.includes("#"))) {
+        playChessSound("check", soundPack);
+      } else if (move.captured || flags.includes("e")) {
+        playChessSound("capture", soundPack);
+      } else {
+        playChessSound("move", soundPack);
+      }
+    }
   };
 
   // --- Background mistake notes logger ---
@@ -616,7 +763,7 @@ export default function App() {
         setValidDestinations([]);
         setPromotionState(null);
         handleMoveIncrement(turnBefore);
-        updateMoveLogs(moveResult);
+        updateMoveLogs(moveResult, fenBefore, turnBefore);
         calculateAdvantage(game);
 
         // Turn on clocks on first moves
@@ -880,7 +1027,7 @@ export default function App() {
   };
 
   const handleLessonSquareClick = (square: string) => {
-    if (!lessonBoard || lessonStatus === "solved") return;
+    if (!lessonBoard || lessonStatus === "solved" || (isPuzzleRushActive && puzzleRushStatus !== "playing")) return;
 
     // Check if clicked square is destination
     if (lessonSelectedSquare && lessonValidDestinations.includes(square)) {
@@ -899,13 +1046,46 @@ export default function App() {
             const moveResult = lessonBoard.move(playedSan);
             addDyingPieceIfCaptured(moveResult);
             setLessonFen(lessonBoard.fen());
-            setLessonStatus("solved");
-            setLessonFeedback("Correct! You found the winning tactical combination.");
+            
+            if (isPuzzleRushActive) {
+              setPuzzleRushScore((prev) => prev + 1);
+              setPuzzleRushCorrectCount((prev) => prev + 1);
+              setPuzzleRushTimeRemaining((prev) => prev + 5);
+              setPuzzleRushFeedback({ correct: true, text: "+5s! Correct Move!" });
+              
+              if (isSoundEnabled) {
+                playChessSound("promotion", soundPack);
+              }
+              
+              // Load next puzzle after 1s delay
+              setTimeout(() => {
+                loadNextPuzzleRush();
+              }, 1000);
+            } else {
+              setLessonStatus("solved");
+              setLessonFeedback("Correct! You found the winning tactical combination.");
+              if (isSoundEnabled) {
+                playChessSound("promotion", soundPack);
+              }
+            }
             setLessonSelectedSquare(null);
             setLessonValidDestinations([]);
           } else {
-            setLessonStatus("wrong");
-            setLessonFeedback(`Incorrect. ${playedSan} is not the optimal tactical move. Try again!`);
+            if (isPuzzleRushActive) {
+              setPuzzleRushIncorrectCount((prev) => prev + 1);
+              setPuzzleRushTimeRemaining((prev) => Math.max(0, prev - 3));
+              setPuzzleRushFeedback({ correct: false, text: "-3s! Incorrect!" });
+              setTimeout(() => setPuzzleRushFeedback(null), 1000);
+              if (isSoundEnabled) {
+                playChessSound("capture", soundPack);
+              }
+            } else {
+              setLessonStatus("wrong");
+              setLessonFeedback(`Incorrect. ${playedSan} is not the optimal tactical move. Try again!`);
+              if (isSoundEnabled) {
+                playChessSound("capture", soundPack);
+              }
+            }
           }
         } catch (err) {
           console.error(err);
@@ -936,6 +1116,96 @@ export default function App() {
     setLessonFeedback("");
     setLessonHintRevealed(false);
   };
+
+  // --- Puzzle Rush (Speed Tactics) Mode Handlers ---
+  const handleStartPuzzleRush = () => {
+    setIsPuzzleRushActive(true);
+    setPuzzleRushStatus("playing");
+    setPuzzleRushScore(0);
+    setPuzzleRushTimeRemaining(60);
+    setPuzzleRushCorrectCount(0);
+    setPuzzleRushIncorrectCount(0);
+    setPuzzleRushFeedback(null);
+
+    // Pick first puzzle randomly
+    const randomIdx = Math.floor(Math.random() * TACTICAL_LESSONS.length);
+    setPuzzleRushLessonIndex(randomIdx);
+
+    const lesson = TACTICAL_LESSONS[randomIdx];
+    setSelectedLesson(lesson);
+    const lChess = new Chess(lesson.fen);
+    setLessonBoard(lChess);
+    setLessonFen(lChess.fen());
+    setLessonSelectedSquare(null);
+    setLessonValidDestinations([]);
+    setLessonStatus("unstarted");
+    setLessonFeedback("");
+    setLessonHintRevealed(false);
+
+    if (puzzleRushTimerRef.current) clearInterval(puzzleRushTimerRef.current);
+    puzzleRushTimerRef.current = setInterval(() => {
+      setPuzzleRushTimeRemaining((prev) => {
+        if (prev <= 1) {
+          if (puzzleRushTimerRef.current) clearInterval(puzzleRushTimerRef.current);
+          setPuzzleRushStatus("ended");
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const handleStopPuzzleRush = () => {
+    if (puzzleRushTimerRef.current) {
+      clearInterval(puzzleRushTimerRef.current);
+      puzzleRushTimerRef.current = null;
+    }
+    setIsPuzzleRushActive(false);
+    setPuzzleRushStatus("idle");
+    setPuzzleRushFeedback(null);
+    
+    // Select standard lesson
+    handleSelectLesson(TACTICAL_LESSONS[0]);
+  };
+
+  const loadNextPuzzleRush = () => {
+    const randomIdx = Math.floor(Math.random() * TACTICAL_LESSONS.length);
+    setPuzzleRushLessonIndex(randomIdx);
+
+    const lesson = TACTICAL_LESSONS[randomIdx];
+    setSelectedLesson(lesson);
+    const lChess = new Chess(lesson.fen);
+    setLessonBoard(lChess);
+    setLessonFen(lChess.fen());
+    setLessonSelectedSquare(null);
+    setLessonValidDestinations([]);
+    setLessonStatus("unstarted");
+    setLessonFeedback("");
+    setLessonHintRevealed(false);
+    setPuzzleRushFeedback(null);
+  };
+
+  useEffect(() => {
+    if (puzzleRushStatus === "ended") {
+      if (isSoundEnabled) {
+        playChessSound("gameover", soundPack);
+      }
+      if (puzzleRushScore > puzzleRushHighScore) {
+        setPuzzleRushHighScore(puzzleRushScore);
+        try {
+          localStorage.setItem("chess_trainer_puzzle_rush_high_score", String(puzzleRushScore));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+  }, [puzzleRushStatus, puzzleRushScore]);
+
+  useEffect(() => {
+    return () => {
+      if (puzzleRushTimerRef.current) clearInterval(puzzleRushTimerRef.current);
+    };
+  }, []);
 
   // --- Chess Openings Explorer Helpers ---
   const handleSelectOpening = (opening: any) => {
@@ -1055,17 +1325,35 @@ export default function App() {
 
   // --- Rendering Helpers ---
   const renderSquareCoordinates = (square: string, rowIdx: number, colIdx: number, isBlackOnBottom: boolean) => {
+    if (boardCoordinatesStyle === "hidden") return null;
+
     const isLight = (rowIdx + colIdx) % 2 === 0;
-    const textColor = isLight ? "text-slate-800 font-semibold" : "text-slate-300 font-semibold";
+    const isBright = boardCoordinatesStyle === "bright";
+    
+    let textColor = isLight ? "text-slate-800 font-semibold" : "text-slate-300 font-semibold";
+    let bgPillClass = "";
+    
+    if (isBright) {
+      textColor = isLight ? "text-slate-900 font-bold" : "text-white font-bold";
+      bgPillClass = isLight ? "bg-white/50 px-1 rounded-sm" : "bg-slate-950/50 px-1 rounded-sm";
+    }
 
     const displayRow = isBlackOnBottom ? rowIdx + 1 : 8 - rowIdx;
     const displayCol = isBlackOnBottom ? 7 - colIdx : colIdx;
     const letter = ["a", "b", "c", "d", "e", "f", "g", "h"][displayCol];
 
     return (
-      <div className="absolute inset-0 p-0.5 flex flex-col justify-between pointer-events-none text-[9px] select-none opacity-40">
-        {displayCol === 0 && <span className={`${textColor} leading-none`}>{displayRow}</span>}
-        {displayRow === 1 && <span className={`${textColor} leading-none self-end mt-auto`}>{letter}</span>}
+      <div className={`absolute inset-0 p-0.5 flex flex-col justify-between pointer-events-none text-[9px] select-none ${isBright ? "opacity-90" : "opacity-40"}`}>
+        {displayCol === 0 && (
+          <span className={`${textColor} leading-none ${bgPillClass} self-start`}>
+            {displayRow}
+          </span>
+        )}
+        {displayRow === 1 && (
+          <span className={`${textColor} leading-none ${bgPillClass} self-end mt-auto`}>
+            {letter}
+          </span>
+        )}
       </div>
     );
   };
@@ -1232,6 +1520,126 @@ export default function App() {
       lastMoveDark: "bg-yellow-500/70 ring-1 ring-yellow-500/50",
       dangerLight: "bg-red-100 border border-red-300",
       dangerDark: "bg-red-900/60 border border-red-400"
+    },
+    amethyst: {
+      name: "Glistening Amethyst",
+      lightSquare: "bg-[#F3E8FF]",
+      darkSquare: "bg-[#7E22CE]",
+      selected: "bg-fuchsia-200/80 ring-2 ring-fuchsia-600 ring-inset",
+      validDestLight: "bg-[#E9D5FF]",
+      validDestDark: "bg-[#6B21A8]/90 text-purple-50",
+      lastMoveLight: "bg-teal-200/70 ring-1 ring-teal-400/50",
+      lastMoveDark: "bg-teal-600/70 ring-1 ring-teal-500/50",
+      dangerLight: "bg-red-100 border border-red-300",
+      dangerDark: "bg-red-900/60 border border-red-400"
+    },
+    halloween: {
+      name: "Spooky Halloween",
+      lightSquare: "bg-[#FFEDD5]",
+      darkSquare: "bg-[#1E1B4B]",
+      selected: "bg-orange-300/80 ring-2 ring-orange-600 ring-inset",
+      validDestLight: "bg-[#FED7AA]",
+      validDestDark: "bg-[#EA580C]/90 text-orange-50",
+      lastMoveLight: "bg-yellow-200/70 ring-1 ring-yellow-400/50",
+      lastMoveDark: "bg-yellow-600/70 ring-1 ring-yellow-500/50",
+      dangerLight: "bg-red-200/80 border border-red-400",
+      dangerDark: "bg-red-950/80 border border-red-600"
+    },
+    sakura: {
+      name: "Sakura Blossom",
+      lightSquare: "bg-[#FFF5F5]",
+      darkSquare: "bg-[#FDA4AF]",
+      selected: "bg-rose-100/90 ring-2 ring-rose-500 ring-inset",
+      validDestLight: "bg-[#FECDD3]",
+      validDestDark: "bg-[#E11D48]/85 text-rose-50",
+      lastMoveLight: "bg-emerald-100/70 ring-1 ring-emerald-400/50",
+      lastMoveDark: "bg-emerald-600/70 ring-1 ring-emerald-500/50",
+      dangerLight: "bg-red-100 border border-red-300",
+      dangerDark: "bg-red-900/60 border border-red-400"
+    },
+    grayscale: {
+      name: "Charcoal Monochrome",
+      lightSquare: "bg-[#F1F5F9]",
+      darkSquare: "bg-[#334155]",
+      selected: "bg-indigo-200/80 ring-2 ring-indigo-500 ring-inset",
+      validDestLight: "bg-[#CBD5E1]",
+      validDestDark: "bg-[#475569]/90 text-slate-50",
+      lastMoveLight: "bg-yellow-100/70 ring-1 ring-yellow-400/50",
+      lastMoveDark: "bg-yellow-500/70 ring-1 ring-yellow-500/50",
+      dangerLight: "bg-red-100 border border-red-350",
+      dangerDark: "bg-red-900/60 border border-red-400"
+    },
+    retro: {
+      name: "Retro GameBoy",
+      lightSquare: "bg-[#9BBC0F]",
+      darkSquare: "bg-[#306230]",
+      selected: "bg-[#8BAC0F]/80 ring-2 ring-[#0F380F] ring-inset",
+      validDestLight: "bg-[#8BAC0F]",
+      validDestDark: "bg-[#0F380F]/90 text-green-50",
+      lastMoveLight: "bg-yellow-200/70 ring-1 ring-yellow-400/50",
+      lastMoveDark: "bg-yellow-600/70 ring-1 ring-yellow-500/50",
+      dangerLight: "bg-red-100 border border-red-300",
+      dangerDark: "bg-red-900/60 border border-red-400"
+    },
+    chocolate: {
+      name: "Sweet Chocolate",
+      lightSquare: "bg-[#EDE0D4]",
+      darkSquare: "bg-[#7F5539]",
+      selected: "bg-amber-100/90 ring-2 ring-amber-700 ring-inset",
+      validDestLight: "bg-[#DDB892]",
+      validDestDark: "bg-[#9C6644]/90 text-amber-50",
+      lastMoveLight: "bg-cyan-100/70 ring-1 ring-cyan-400/50",
+      lastMoveDark: "bg-cyan-600/70 ring-1 ring-cyan-500/50",
+      dangerLight: "bg-red-100 border border-red-300",
+      dangerDark: "bg-red-900/60 border border-red-400"
+    },
+    inferno: {
+      name: "Molten Inferno",
+      lightSquare: "bg-[#FFEDD5]",
+      darkSquare: "bg-[#7C2D12]",
+      selected: "bg-red-200/90 ring-2 ring-red-600 ring-inset",
+      validDestLight: "bg-[#FDBA74]",
+      validDestDark: "bg-[#EA580C]/90 text-orange-50",
+      lastMoveLight: "bg-yellow-100/70 ring-1 ring-yellow-400/50",
+      lastMoveDark: "bg-yellow-500/70 ring-1 ring-yellow-500/50",
+      dangerLight: "bg-red-100 border border-red-300",
+      dangerDark: "bg-red-900/60 border border-red-400"
+    },
+    abyss: {
+      name: "Abyssal Trench",
+      lightSquare: "bg-[#0F172A]",
+      darkSquare: "bg-[#020617]",
+      selected: "bg-cyan-950/80 ring-2 ring-cyan-500 ring-inset",
+      validDestLight: "bg-[#1E293B]/60 ring-1 ring-slate-500/40",
+      validDestDark: "bg-[#0F172A]/80 ring-1 ring-cyan-500/40",
+      lastMoveLight: "bg-violet-500/30 ring-1 ring-violet-400/50",
+      lastMoveDark: "bg-violet-600/40 ring-1 ring-violet-500/50",
+      dangerLight: "bg-rose-950/60 border border-rose-500/40",
+      dangerDark: "bg-rose-950/85 border border-rose-600/50"
+    },
+    bubblegum: {
+      name: "Bubblegum Pop",
+      lightSquare: "bg-[#FCE7F3]",
+      darkSquare: "bg-[#EC4899]",
+      selected: "bg-indigo-100/90 ring-2 ring-indigo-500 ring-inset",
+      validDestLight: "bg-[#FBCFE8]",
+      validDestDark: "bg-[#DB2777]/90 text-pink-50",
+      lastMoveLight: "bg-cyan-100/70 ring-1 ring-cyan-400/50",
+      lastMoveDark: "bg-cyan-600/70 ring-1 ring-cyan-500/50",
+      dangerLight: "bg-red-100 border border-red-300",
+      dangerDark: "bg-red-900/60 border border-red-400"
+    },
+    bronze: {
+      name: "Ancient Bronze",
+      lightSquare: "bg-[#FEF3C7]",
+      darkSquare: "bg-[#92400E]",
+      selected: "bg-amber-100/90 ring-2 ring-amber-600 ring-inset",
+      validDestLight: "bg-[#FDE68A]",
+      validDestDark: "bg-[#D97706]/90 text-amber-50",
+      lastMoveLight: "bg-teal-100/70 ring-1 ring-teal-400/50",
+      lastMoveDark: "bg-teal-600/70 ring-1 ring-teal-500/50",
+      dangerLight: "bg-red-100 border border-red-300",
+      dangerDark: "bg-red-900/60 border border-red-400"
     }
   };
 
@@ -1357,6 +1765,27 @@ export default function App() {
                 </div>
               </motion.div>
             ))}
+
+            {/* Brand New Floating Move Grade Badge */}
+            {floatingMoveBadge && floatingMoveBadge.square === sqName && (
+              <motion.div
+                initial={{ scale: 0.5, opacity: 0, y: 10 }}
+                animate={{ scale: [1, 1.1, 1], opacity: [0, 1, 1, 0], y: -30 }}
+                transition={{ duration: 1.4, times: [0, 0.15, 0.85, 1], ease: "easeOut" }}
+                className={`absolute z-40 px-1.5 py-0.5 rounded-full text-[9px] md:text-[10px] font-bold shadow-lg pointer-events-none whitespace-nowrap text-white ${
+                  floatingMoveBadge.type === "book" ? "bg-cyan-600 border border-cyan-400" :
+                  floatingMoveBadge.type === "excellent" ? "bg-emerald-600 border border-emerald-400" :
+                  floatingMoveBadge.type === "mistake" ? "bg-rose-600 border border-rose-400" :
+                  floatingMoveBadge.type === "check" ? "bg-amber-500 border border-amber-300" :
+                  floatingMoveBadge.type === "promotion" ? "bg-fuchsia-600 border border-fuchsia-400" :
+                  floatingMoveBadge.type === "castle" ? "bg-indigo-600 border border-indigo-400" :
+                  floatingMoveBadge.type === "capture" ? "bg-sky-600 border border-sky-400" :
+                  "bg-slate-700 border border-slate-500"
+                }`}
+              >
+                {floatingMoveBadge.text}
+              </motion.div>
+            )}
 
             {/* Danger Vision alert badges for user pieces under active threat */}
             {isDangerVisionEnabled && isThreatened && isMyPiece && (
@@ -1670,33 +2099,101 @@ export default function App() {
           )}
 
           {/* Lessons list (Only shown in tactics trainer tab) */}
+          {/* Lessons list (Only shown in tactics trainer tab) */}
           {activeTab === "lessons" && (
-            <div className="p-4 border-b border-slate-800 space-y-2">
-              <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1 mb-2">
-                <BookOpen size={10} /> Lessons & Puzzles
-              </h2>
-              <div className="space-y-1.5 max-h-[180px] overflow-y-auto pr-1">
-                {TACTICAL_LESSONS.map((lesson) => (
-                  <button
-                    key={lesson.id}
-                    disabled={isAiThinking}
-                    onClick={() => handleSelectLesson(lesson)}
-                    className={`w-full p-2 rounded border text-left cursor-pointer transition-all ${
-                      selectedLesson?.id === lesson.id
-                        ? "bg-indigo-600/10 border-indigo-500"
-                        : "bg-slate-900/40 border-slate-800 hover:bg-slate-800/60"
-                    } disabled:opacity-40 disabled:cursor-not-allowed`}
-                  >
-                    <div className="flex justify-between items-start">
-                      <span className="text-[11px] font-bold text-slate-200 leading-tight">{lesson.title}</span>
-                      {lessonStatus === "solved" && selectedLesson?.id === lesson.id && (
-                        <Check size={11} className="text-emerald-400 mt-0.5" />
-                      )}
+            <div className="p-4 border-b border-slate-800 space-y-4">
+              
+              {/* PUZZLE RUSH PREMIUM MODULE */}
+              <div className="p-3 bg-gradient-to-br from-indigo-950/40 to-slate-900 border border-indigo-500/20 rounded-xl space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-1">
+                    <Zap size={11} className="text-amber-400 fill-amber-400 animate-pulse" />
+                    <span>Puzzle Rush ⚡</span>
+                  </h3>
+                  <div className="text-[9px] bg-indigo-500/10 text-indigo-300 font-bold px-1.5 py-0.5 rounded">
+                    High Score: <span className="text-amber-400 font-extrabold">{puzzleRushHighScore}</span>
+                  </div>
+                </div>
+
+                {isPuzzleRushActive ? (
+                  <div className="space-y-3 animate-fadeIn">
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className="bg-slate-950/60 p-2 rounded-lg border border-slate-800">
+                        <div className="text-[9px] text-slate-400 font-bold uppercase leading-none">Score</div>
+                        <div className="text-lg font-black text-emerald-400 mt-1">{puzzleRushScore}</div>
+                      </div>
+                      <div className="bg-slate-950/60 p-2 rounded-lg border border-slate-800">
+                        <div className="text-[9px] text-slate-400 font-bold uppercase leading-none">Time</div>
+                        <div className="text-lg font-black text-amber-400 mt-1">{puzzleRushTimeRemaining}s</div>
+                      </div>
+                      <div className="bg-slate-950/60 p-2 rounded-lg border border-slate-800">
+                        <div className="text-[9px] text-slate-400 font-bold uppercase leading-none">Errors</div>
+                        <div className="text-lg font-black text-rose-500 mt-1 flex items-center justify-center gap-0.5">
+                          {puzzleRushIncorrectCount === 0 ? "0" : Array.from({ length: Math.min(3, puzzleRushIncorrectCount) }).map((_, i) => "❌")}
+                        </div>
+                      </div>
                     </div>
-                    <span className="text-[9px] text-indigo-400 font-bold block mt-0.5">{lesson.motif}</span>
-                  </button>
-                ))}
+
+                    {/* Progress Bar */}
+                    <div className="w-full bg-slate-950 rounded-full h-1.5 overflow-hidden">
+                      <div 
+                        className="bg-gradient-to-r from-indigo-500 to-amber-400 h-full transition-all duration-1000" 
+                        style={{ width: `${Math.min(100, (puzzleRushTimeRemaining / 60) * 100)}%` }}
+                      />
+                    </div>
+
+                    <button
+                      onClick={handleStopPuzzleRush}
+                      className="w-full py-1.5 bg-rose-600/25 hover:bg-rose-600/35 text-rose-400 text-[10px] font-black uppercase tracking-wider rounded border border-rose-500/20 cursor-pointer transition-all"
+                    >
+                      Quit Puzzle Rush
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-[10px] text-slate-400 leading-relaxed">
+                      Beat the clock! Solve random tactical combinations. Correct moves add <span className="text-emerald-400 font-bold">+5s</span>, wrong moves deduct <span className="text-rose-400 font-bold">-3s</span>.
+                    </p>
+                    <button
+                      onClick={handleStartPuzzleRush}
+                      className="w-full py-2 bg-gradient-to-r from-amber-500 to-indigo-600 hover:from-amber-400 hover:to-indigo-500 text-white text-[10px] font-black uppercase tracking-wider rounded shadow-md cursor-pointer transition-all flex items-center justify-center gap-1"
+                    >
+                      <Zap size={11} className="fill-white" /> Start Puzzle Rush
+                    </button>
+                  </div>
+                )}
               </div>
+
+              {/* Standard lessons list, only if Puzzle Rush is idle */}
+              {!isPuzzleRushActive && (
+                <div className="space-y-2">
+                  <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1">
+                    <BookOpen size={10} /> Practice Lessons
+                  </h2>
+                  <div className="space-y-1.5 max-h-[180px] overflow-y-auto pr-1">
+                    {TACTICAL_LESSONS.map((lesson) => (
+                      <button
+                        key={lesson.id}
+                        disabled={isAiThinking}
+                        onClick={() => handleSelectLesson(lesson)}
+                        className={`w-full p-2 rounded border text-left cursor-pointer transition-all ${
+                          selectedLesson?.id === lesson.id
+                            ? "bg-indigo-600/10 border-indigo-500"
+                            : "bg-slate-900/40 border-slate-800 hover:bg-slate-800/60"
+                        } disabled:opacity-40 disabled:cursor-not-allowed`}
+                      >
+                        <div className="flex justify-between items-start">
+                          <span className="text-[11px] font-bold text-slate-200 leading-tight">{lesson.title}</span>
+                          {lessonStatus === "solved" && selectedLesson?.id === lesson.id && (
+                            <Check size={11} className="text-emerald-400 mt-0.5" />
+                          )}
+                        </div>
+                        <span className="text-[9px] text-indigo-400 font-bold block mt-0.5">{lesson.motif}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -1912,7 +2409,7 @@ export default function App() {
             <div>
               <label className="text-[9px] text-slate-400 block mb-1.5 font-bold uppercase tracking-wider">Piece Style</label>
               <div className="grid grid-cols-3 gap-1 p-1 rounded-lg bg-slate-950 border border-slate-800/80">
-                {(["classic", "minimal", "abstract", "neon", "royal", "nature"] as const).map((styleId) => {
+                {(["classic", "minimal", "abstract", "neon", "royal", "nature", "glass", "gothic", "shadow", "retro8bit", "space", "aurora", "steampunk", "origami", "cartoon"] as const).map((styleId) => {
                   const isSel = pieceStyle === styleId;
                   
                   // Display names for piece styles
@@ -1923,6 +2420,15 @@ export default function App() {
                     neon: "Neon Glow",
                     royal: "Royal Metal",
                     nature: "Wood Grain",
+                    glass: "Glass Orb",
+                    gothic: "Gothic Seal",
+                    shadow: "Glow Shadow",
+                    retro8bit: "Retro 8-Bit",
+                    space: "Space Nebula",
+                    aurora: "Aurora Borealis",
+                    steampunk: "Steampunk Brass",
+                    origami: "Origami Paper",
+                    cartoon: "Cartoon Emoji",
                   };
                   
                   return (
@@ -1940,6 +2446,76 @@ export default function App() {
                 })}
               </div>
             </div>
+
+            {/* Coordinate Styling Toggle */}
+            <div className="mt-3.5">
+              <label className="text-[9px] text-slate-400 block mb-1.5 font-bold uppercase tracking-wider">Board Coordinates</label>
+              <div className="grid grid-cols-3 gap-1 p-1 rounded-lg bg-slate-950 border border-slate-800/80">
+                {(["inset", "bright", "hidden"] as const).map((styleId) => {
+                  const isSel = boardCoordinatesStyle === styleId;
+                  const names = {
+                    inset: "Subtle",
+                    bright: "Brilliant",
+                    hidden: "None",
+                  };
+                  return (
+                    <button
+                      key={styleId}
+                      onClick={() => setBoardCoordinatesStyle(styleId)}
+                      className={`py-1 text-[8px] md:text-[9px] font-bold rounded-md text-center cursor-pointer transition-all ${
+                        isSel ? "bg-indigo-600 text-white font-extrabold shadow-sm" : "text-slate-400 hover:text-slate-200"
+                      }`}
+                    >
+                      {names[styleId]}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Synthesized Audio Settings & Sound Packs */}
+            <div className="mt-3.5">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Synthetic Sound FX</label>
+                <button
+                  onClick={() => setIsSoundEnabled(!isSoundEnabled)}
+                  className={`text-[9px] font-bold px-1.5 py-0.5 rounded transition-all cursor-pointer ${
+                    isSoundEnabled ? "bg-emerald-600/20 text-emerald-400 border border-emerald-500/30" : "bg-rose-600/20 text-rose-400 border border-rose-500/30"
+                  }`}
+                >
+                  {isSoundEnabled ? "On" : "Muted"}
+                </button>
+              </div>
+              
+              {isSoundEnabled && (
+                <div className="grid grid-cols-4 gap-1 p-1 rounded-lg bg-slate-950 border border-slate-800/80">
+                  {(["wood", "retro", "laser", "zen"] as const).map((packId) => {
+                    const isSel = soundPack === packId;
+                    const names = {
+                      wood: "Classic",
+                      retro: "8-Bit",
+                      laser: "Laser",
+                      zen: "Zendo",
+                    };
+                    return (
+                      <button
+                        key={packId}
+                        onClick={() => {
+                          setSoundPack(packId);
+                          playChessSound("move", packId);
+                        }}
+                        className={`py-1 text-[8px] md:text-[9.5px] font-bold rounded-md text-center cursor-pointer transition-all ${
+                          isSel ? "bg-indigo-600 text-white font-extrabold shadow-sm" : "text-slate-400 hover:text-slate-200"
+                        }`}
+                      >
+                        {names[packId]}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
           </div>
           </div>
         </aside>
@@ -2293,96 +2869,198 @@ export default function App() {
                   )}
                 </div>
               )}
-
             </div>
           )}
 
           {/* ================= TACTICS TRAINER LESSONS BOARD ================= */}
           {activeTab === "lessons" && selectedLesson && lessonBoard && (
-            <div className="w-full max-w-[420px] flex flex-col justify-center">
-              <div className="mb-2">
-                <span className="text-[10px] bg-indigo-600/30 text-indigo-300 font-extrabold px-2 py-0.5 rounded uppercase tracking-wider">
-                  Tactics Challenge
-                </span>
-                <h3 className="text-sm font-bold text-slate-200 mt-1">{selectedLesson.title}</h3>
-                <p className="text-[10px] text-slate-400 mt-0.5">{selectedLesson.description}</p>
-              </div>
+            <div className="w-full max-w-[420px] flex flex-col justify-center animate-fadeIn">
+              
+              {isPuzzleRushActive ? (
+                <div className="mb-2 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] bg-amber-500/20 text-amber-300 font-extrabold px-2 py-0.5 rounded uppercase tracking-wider flex items-center gap-1 w-max">
+                      <Zap size={9} className="fill-amber-300 animate-bounce" /> Rush Puzzle #{puzzleRushScore + 1}
+                    </span>
+                    <h3 className="text-sm font-black text-slate-200 mt-1">Speed Chess Tactics</h3>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[9px] text-slate-400 font-bold block leading-none uppercase">Time Left</span>
+                    <span className={`text-xl font-black ${puzzleRushTimeRemaining <= 10 ? "text-rose-500 animate-pulse" : "text-amber-400"} mt-0.5 block`}>
+                      {puzzleRushTimeRemaining}s
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="mb-2">
+                  <span className="text-[10px] bg-indigo-600/30 text-indigo-300 font-extrabold px-2 py-0.5 rounded uppercase tracking-wider">
+                    Tactics Challenge
+                  </span>
+                  <h3 className="text-sm font-bold text-slate-200 mt-1">{selectedLesson.title}</h3>
+                  <p className="text-[10px] text-slate-400 mt-0.5">{selectedLesson.description}</p>
+                </div>
+              )}
 
               {/* Chessboard Grid for Puzzle */}
-              <div className="border-2 md:border-4 border-slate-800 rounded shadow-2xl overflow-hidden bg-slate-800 aspect-square w-full">
+              <div className="border-2 md:border-4 border-slate-800 rounded shadow-2xl overflow-hidden bg-slate-800 aspect-square w-full relative">
                 <div className="grid grid-cols-8 grid-rows-8 w-full h-full">
                   {generateBoardGrid(lessonBoard, handleLessonSquareClick, lessonSelectedSquare, lessonValidDestinations)}
                 </div>
+
+                {/* Puzzle Rush Ending Screen Overlay */}
+                {isPuzzleRushActive && puzzleRushStatus === "ended" && (
+                  <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="absolute inset-0 bg-slate-950/90 flex flex-col items-center justify-center p-6 text-center z-40 backdrop-blur-sm"
+                  >
+                    <motion.div
+                      initial={{ scale: 0.9, y: 15 }}
+                      animate={{ scale: 1, y: 0 }}
+                      className="space-y-4 max-w-xs"
+                    >
+                      <div className="w-14 h-14 bg-gradient-to-tr from-amber-500 to-amber-300 rounded-full flex items-center justify-center text-2xl mx-auto shadow-lg shadow-amber-500/20">
+                        🏆
+                      </div>
+                      <div className="space-y-1">
+                        <h2 className="text-lg font-black text-slate-100 uppercase tracking-wide">Time's Up!</h2>
+                        <p className="text-[10.5px] text-slate-400">Puzzle Rush speed challenge is complete.</p>
+                      </div>
+
+                      <div className="bg-slate-900/80 p-3.5 rounded-xl border border-slate-800 space-y-2">
+                        <div className="text-xs text-slate-400 font-bold uppercase leading-none">Puzzles Solved</div>
+                        <div className="text-3xl font-black text-emerald-400">{puzzleRushScore}</div>
+                        
+                        {puzzleRushScore >= puzzleRushHighScore && puzzleRushScore > 0 && (
+                          <div className="text-[10px] bg-amber-500/10 text-amber-300 border border-amber-500/30 px-2 py-1 rounded font-extrabold animate-pulse">
+                            🏆 NEW PERSONAL BEST!
+                          </div>
+                        )}
+                        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800/60 text-center text-[10px] font-bold text-slate-400">
+                          <div>Correct: <span className="text-emerald-400">{puzzleRushCorrectCount}</span></div>
+                          <div>Errors: <span className="text-rose-500">{puzzleRushIncorrectCount}</span></div>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleStartPuzzleRush}
+                          className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-extrabold uppercase rounded cursor-pointer transition-all tracking-wider shadow"
+                        >
+                          Play Again
+                        </button>
+                        <button
+                          onClick={handleStopPuzzleRush}
+                          className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 text-[10px] font-bold uppercase rounded cursor-pointer transition-all"
+                        >
+                          Exit
+                        </button>
+                      </div>
+                    </motion.div>
+                  </motion.div>
+                )}
               </div>
 
               {/* Feedback and interactions block */}
               <div className="mt-3 p-3 rounded bg-[#1E293B] border border-slate-800">
-                {lessonStatus === "unstarted" && (
+                {isPuzzleRushActive ? (
                   <div>
-                    <p className="text-[11px] text-slate-300 italic">Find the best tactical move for {lessonBoard.turn() === "w" ? "White" : "Black"} in this position.</p>
-                    <div className="flex justify-between items-center mt-2.5">
-                      <button
-                        onClick={() => setLessonHintRevealed(true)}
-                        className="text-[10px] text-indigo-400 font-bold hover:underline"
-                      >
-                        Need a clue?
-                      </button>
-                      <button
-                        onClick={handleResetLesson}
-                        className="text-[10px] text-slate-400 font-bold hover:underline"
-                      >
-                        Reset position
-                      </button>
-                    </div>
-                    {lessonHintRevealed && (
-                      <p className="text-[10px] text-indigo-300 bg-indigo-600/10 border border-indigo-500/20 p-2 rounded mt-2 leading-relaxed">
-                        <strong>Coaching Clue:</strong> {selectedLesson.hint}
-                      </p>
+                    {puzzleRushStatus === "playing" && (
+                      <div className="space-y-2">
+                        <p className="text-[11px] text-slate-300 font-semibold flex items-center gap-1 justify-center">
+                          <Zap size={11} className="text-amber-400" /> Play the winning shot for {lessonBoard.turn() === "w" ? "White" : "Black"}!
+                        </p>
+                        
+                        {puzzleRushFeedback && (
+                          <motion.div
+                            key={puzzleRushFeedback.text}
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            className={`p-2 rounded text-[10.5px] font-extrabold text-center ${
+                              puzzleRushFeedback.correct 
+                                ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 animate-pulse" 
+                                : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                            }`}
+                          >
+                            {puzzleRushFeedback.text}
+                          </motion.div>
+                        )}
+                      </div>
+                    )}
+                    {puzzleRushStatus === "ended" && (
+                      <p className="text-[11px] text-slate-400 italic text-center">Session complete. Great effort!</p>
                     )}
                   </div>
-                )}
+                ) : (
+                  <>
+                    {lessonStatus === "unstarted" && (
+                      <div>
+                        <p className="text-[11px] text-slate-300 italic">Find the best tactical move for {lessonBoard.turn() === "w" ? "White" : "Black"} in this position.</p>
+                        <div className="flex justify-between items-center mt-2.5">
+                          <button
+                            onClick={() => setLessonHintRevealed(true)}
+                            className="text-[10px] text-indigo-400 font-bold hover:underline cursor-pointer"
+                          >
+                            Need a clue?
+                          </button>
+                          <button
+                            onClick={handleResetLesson}
+                            className="text-[10px] text-slate-400 font-bold hover:underline cursor-pointer"
+                          >
+                            Reset position
+                          </button>
+                        </div>
+                        {lessonHintRevealed && (
+                          <p className="text-[10px] text-indigo-300 bg-indigo-600/10 border border-indigo-500/20 p-2 rounded mt-2 leading-relaxed animate-fadeIn">
+                            <strong>Coaching Clue:</strong> {selectedLesson.hint}
+                          </p>
+                        )}
+                      </div>
+                    )}
 
-                {lessonStatus === "wrong" && (
-                  <div className="space-y-2">
-                    <p className="text-xs text-rose-400 font-bold flex items-center gap-1">
-                      <XCircle size={13} /> {lessonFeedback}
-                    </p>
-                    <button
-                      onClick={handleResetLesson}
-                      className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] rounded font-bold transition-all uppercase"
-                    >
-                      Try Again
-                    </button>
-                  </div>
-                )}
+                    {lessonStatus === "wrong" && (
+                      <div className="space-y-2">
+                        <p className="text-xs text-rose-400 font-bold flex items-center gap-1">
+                          <XCircle size={13} /> {lessonFeedback}
+                        </p>
+                        <button
+                          onClick={handleResetLesson}
+                          className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] rounded font-bold transition-all uppercase cursor-pointer"
+                        >
+                          Try Again
+                        </button>
+                      </div>
+                    )}
 
-                {lessonStatus === "solved" && (
-                  <div className="space-y-2">
-                    <p className="text-xs text-emerald-400 font-bold flex items-center gap-1">
-                      <CheckCircle2 size={13} /> {lessonFeedback}
-                    </p>
-                    <p className="text-[10px] text-slate-300 leading-relaxed bg-slate-900/60 p-2 rounded border border-slate-800">
-                      {selectedLesson.explanation}
-                    </p>
-                    <div className="flex gap-2 mt-2">
-                      <button
-                        onClick={() => {
-                          const currentIndex = TACTICAL_LESSONS.findIndex((l) => l.id === selectedLesson.id);
-                          const nextIndex = (currentIndex + 1) % TACTICAL_LESSONS.length;
-                          handleSelectLesson(TACTICAL_LESSONS[nextIndex]);
-                        }}
-                        className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold rounded transition-all uppercase tracking-wider"
-                      >
-                        Next Lesson
-                      </button>
-                      <button
-                        onClick={handleResetLesson}
-                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 text-[10px] rounded font-bold transition-all uppercase"
-                      >
-                        Reset
-                      </button>
-                    </div>
-                  </div>
+                    {lessonStatus === "solved" && (
+                      <div className="space-y-2 animate-fadeIn">
+                        <p className="text-xs text-emerald-400 font-bold flex items-center gap-1">
+                          <CheckCircle2 size={13} /> {lessonFeedback}
+                        </p>
+                        <p className="text-[10px] text-slate-300 leading-relaxed bg-slate-900/60 p-2 rounded border border-slate-800">
+                          {selectedLesson.explanation}
+                        </p>
+                        <div className="flex gap-2 mt-2">
+                          <button
+                            onClick={() => {
+                              const currentIndex = TACTICAL_LESSONS.findIndex((l) => l.id === selectedLesson.id);
+                              const nextIndex = (currentIndex + 1) % TACTICAL_LESSONS.length;
+                              handleSelectLesson(TACTICAL_LESSONS[nextIndex]);
+                            }}
+                            className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold rounded transition-all uppercase tracking-wider cursor-pointer"
+                          >
+                            Next Lesson
+                          </button>
+                          <button
+                            onClick={handleResetLesson}
+                            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 text-[10px] rounded font-bold transition-all uppercase cursor-pointer"
+                          >
+                            Reset
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -3053,6 +3731,56 @@ export default function App() {
               </div>
             )}
 
+            {/* LIVE MOVE HISTORY LOG (Play view / Replay view only) */}
+            {(activeTab === "play" || activeTab === "saved") && (
+              <div className="space-y-2.5">
+                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1 border-b border-slate-800 pb-1.5 justify-between">
+                  <span className="flex items-center gap-1">
+                    <BookOpen size={12} className="text-indigo-400" /> Match Move History
+                  </span>
+                  <span className="font-mono text-[9px] bg-indigo-500/10 text-indigo-300 px-1.5 py-0.5 rounded">
+                    {selectedSavedGame ? selectedSavedGame.moves.length : moveHistory.length} moves
+                  </span>
+                </h3>
+                {(() => {
+                  const moves = selectedSavedGame ? selectedSavedGame.moves : moveHistory.map(m => m.san);
+                  if (moves.length === 0) {
+                    return (
+                      <p className="text-[10px] text-slate-500 italic py-1">No moves recorded yet. Start making moves on the board!</p>
+                    );
+                  }
+
+                  // Group moves into numbered pairs: e.g., 1. e4 e5
+                  const pairs: Array<{ num: number; white: string; black?: string }> = [];
+                  for (let i = 0; i < moves.length; i += 2) {
+                    pairs.push({
+                      num: Math.floor(i / 2) + 1,
+                      white: moves[i],
+                      black: moves[i + 1],
+                    });
+                  }
+
+                  return (
+                    <div className="grid grid-cols-2 gap-1.5 max-h-[140px] overflow-y-auto pr-1 custom-scrollbar text-[11px]">
+                      {pairs.map((pair, idx) => (
+                        <motion.div
+                          key={idx}
+                          initial={{ opacity: 0, x: -8, scale: 0.95 }}
+                          animate={{ opacity: 1, x: 0, scale: 1 }}
+                          transition={{ duration: 0.25, ease: "easeOut" }}
+                          className="flex items-center justify-between bg-slate-900/60 hover:bg-slate-900/90 px-2.5 py-1.5 rounded border border-slate-800/60 font-mono text-slate-300 shadow-sm"
+                        >
+                          <span className="text-slate-500 font-extrabold text-[10px] w-5">{pair.num}.</span>
+                          <span className="flex-1 text-center text-indigo-300 font-bold truncate">{pair.white}</span>
+                          <span className="flex-1 text-center text-slate-300 truncate">{pair.black || "—"}</span>
+                        </motion.div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
             {/* LIVE MISTAKES NOTES FEED (Play view / Replay view only) */}
             {(activeTab === "play" || activeTab === "saved") && (
               <div className="space-y-2.5">
@@ -3074,7 +3802,13 @@ export default function App() {
                   return (
                     <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
                       {activeMistakes.map((m, i) => (
-                        <div key={i} className="bg-amber-500/5 border border-amber-500/20 p-2.5 rounded-md text-left">
+                        <motion.div
+                          key={i}
+                          initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          transition={{ duration: 0.25, ease: "easeOut" }}
+                          className="bg-amber-500/5 border border-amber-500/20 p-2.5 rounded-md text-left"
+                        >
                           <div className="flex justify-between items-center text-[10px] font-bold text-amber-300">
                             <span>Move {m.moveNumber} ({m.turn === "w" ? "White" : "Black"})</span>
                             <span className="font-mono text-slate-400">Played: {m.moveMade} → Best: {m.recommendedMove}</span>
@@ -3102,7 +3836,7 @@ export default function App() {
                               </div>
                             </div>
                           )}
-                        </div>
+                        </motion.div>
                       ))}
                     </div>
                   );

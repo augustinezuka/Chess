@@ -595,13 +595,15 @@ export function getBestMove(fen: string, difficulty: Difficulty): string {
   }
 
   // If Black's very first reply to e4 or d4, offer standard thematic defenses
-  if (chess.history().length === 1 && activeColor === "b") {
-    const whiteMove = chess.history()[0];
-    if (whiteMove === "e4") {
+  const isBlacksFirstMove = activeColor === "b" && fen.endsWith(" 1");
+  if (isBlacksFirstMove) {
+    const e4Piece = chess.get("e4");
+    if (e4Piece && e4Piece.type === "p" && e4Piece.color === "w") {
       const responses = ["c5", "e5", "e6", "c6"]; // Sicilian, Open Game, French, Caro-Kann
       return responses[Math.floor(Math.random() * responses.length)];
     }
-    if (whiteMove === "d4") {
+    const d4Piece = chess.get("d4");
+    if (d4Piece && d4Piece.type === "p" && d4Piece.color === "w") {
       const responses = ["Nf6", "d5", "e6"]; // Indian Defense, Queen's Gambit reply, Nimzo / Dutch prep
       return responses[Math.floor(Math.random() * responses.length)];
     }
@@ -613,10 +615,10 @@ export function getBestMove(fen: string, difficulty: Difficulty): string {
 
   if (difficulty === "Easy") {
     targetDepth = 1;
-    errorRate = 0.35;
+    errorRate = 0.70;
   } else if (difficulty === "Medium") {
     targetDepth = 2;
-    errorRate = 0.10;
+    errorRate = 0.15;
   } else {
     targetDepth = 3;
     errorRate = 0;
@@ -628,18 +630,37 @@ export function getBestMove(fen: string, difficulty: Difficulty): string {
     return moves[randomIndex];
   }
 
-  // --- Fast Single-Pass Iterative Deepening Search ---
+  // --- Fast Single-Pass Search with Tie-Breaking/Randomization ---
   const memo = new Map<string, CacheEntry>();
-  let bestMove = moves[0];
+  const scoredMoves: Array<{ move: string; score: number }> = [];
 
-  for (let d = 1; d <= targetDepth; d++) {
-    const result = minimax(chess, d, -Infinity, Infinity, isMaximizing, memo);
-    if (result.move) {
-      bestMove = result.move;
+  for (const move of moves) {
+    try {
+      chess.move(move);
+      // Evaluate the position after this move
+      const score = minimax(chess, targetDepth, -Infinity, Infinity, !isMaximizing, memo).score;
+      chess.undo();
+      scoredMoves.push({ move, score });
+    } catch (e) {
+      // Safety fallback in case of move issues
+      try { chess.undo(); } catch (_) {}
     }
   }
 
-  return bestMove;
+  if (scoredMoves.length === 0) {
+    return moves[Math.floor(Math.random() * moves.length)];
+  }
+
+  // Sort and select the best moves (allowing a tiny margin for play style variation)
+  if (isMaximizing) {
+    const maxScore = Math.max(...scoredMoves.map((sm) => sm.score));
+    const candidates = scoredMoves.filter((sm) => sm.score >= maxScore - 5).map((sm) => sm.move);
+    return candidates[Math.floor(Math.random() * candidates.length)];
+  } else {
+    const minScore = Math.min(...scoredMoves.map((sm) => sm.score));
+    const candidates = scoredMoves.filter((sm) => sm.score <= minScore + 5).map((sm) => sm.move);
+    return candidates[Math.floor(Math.random() * candidates.length)];
+  }
 }
 
 /**

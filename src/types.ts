@@ -25,6 +25,7 @@ export interface MoveRecord {
   color: ChessColor;
   captured?: string;
   promotion?: string;
+  grade?: "book" | "excellent" | "good" | "inaccuracy" | "mistake" | "check" | "capture" | "castle" | "promotion";
 }
 
 export interface AiHint {
