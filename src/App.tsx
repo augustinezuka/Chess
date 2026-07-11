@@ -106,7 +106,7 @@ export default function App() {
     }
   });
 
-  const [boardTheme, setBoardTheme] = useState<"slate" | "wood" | "emerald" | "midnight" | "ocean" | "crimson" | "desert" | "cyberpunk" | "forest" | "arctic" | "vintage" | "royal" | "amethyst" | "halloween" | "sakura" | "grayscale" | "retro" | "chocolate" | "inferno" | "abyss" | "bubblegum" | "bronze">(() => {
+  const [boardTheme, setBoardTheme] = useState<"slate" | "wood" | "emerald" | "midnight" | "ocean" | "crimson" | "desert" | "cyberpunk" | "forest" | "arctic" | "vintage" | "royal" | "amethyst" | "halloween" | "sakura" | "grayscale" | "retro" | "chocolate" | "inferno" | "abyss" | "bubblegum" | "bronze" | "gold" | "matrix" | "sakuraPastel">(() => {
     try {
       const saved = localStorage.getItem("chess_trainer_board_theme");
       return (saved as any) || "slate";
@@ -115,7 +115,7 @@ export default function App() {
     }
   });
 
-  const [pieceStyle, setPieceStyle] = useState<"classic" | "minimal" | "abstract" | "neon" | "royal" | "nature" | "glass" | "gothic" | "shadow" | "retro8bit" | "space" | "aurora" | "steampunk" | "origami" | "cartoon">(() => {
+  const [pieceStyle, setPieceStyle] = useState<"classic" | "minimal" | "abstract" | "neon" | "royal" | "nature" | "glass" | "gothic" | "shadow" | "retro8bit" | "space" | "aurora" | "steampunk" | "origami" | "cartoon" | "egyptian" | "pirate" | "cyberGlitch">(() => {
     try {
       const saved = localStorage.getItem("chess_trainer_piece_style");
       return (saved as any) || "classic";
@@ -504,13 +504,27 @@ export default function App() {
       const aiTimer = setTimeout(() => {
         try {
           const currentFen = game.fen();
+          const calculationStart = Date.now();
           const bestMoveSan = getBestMove(currentFen, difficulty);
+          const calculationDuration = Date.now() - calculationStart;
+
           if (bestMoveSan) {
             const turnBefore = game.turn();
             const fenBefore = game.fen();
             const resultMove = game.move(bestMoveSan);
 
             if (resultMove) {
+              // Deduct CPU calculation duration from the AI opponent's clock
+              setTimerState((prev) => {
+                const newWhiteTime = turnBefore === "w" ? Math.max(0, prev.whiteTime - calculationDuration) : prev.whiteTime;
+                const newBlackTime = turnBefore === "b" ? Math.max(0, prev.blackTime - calculationDuration) : prev.blackTime;
+                return {
+                  ...prev,
+                  whiteTime: newWhiteTime,
+                  blackTime: newBlackTime,
+                };
+              });
+
               addDyingPieceIfCaptured(resultMove);
               setFen(game.fen());
               handleMoveIncrement(turnBefore);
@@ -606,16 +620,20 @@ export default function App() {
     };
 
     const badgeInfo = gradeDisplayNames[grade] || { text: "Good Move 👍", type: "good" };
-    setFloatingMoveBadge({
-      text: badgeInfo.text,
-      type: badgeInfo.type,
-      square: move.to,
-    });
+    
+    // Prevent showing floating move grade badges for excellent, book, and good moves
+    if (grade !== "excellent" && grade !== "book" && grade !== "good") {
+      setFloatingMoveBadge({
+        text: badgeInfo.text,
+        type: badgeInfo.type,
+        square: move.to,
+      });
 
-    // Auto-clear floating badge after 1.5s
-    setTimeout(() => {
-      setFloatingMoveBadge(null);
-    }, 1500);
+      // Auto-clear floating badge after 1.5s
+      setTimeout(() => {
+        setFloatingMoveBadge(null);
+      }, 1500);
+    }
 
     // 4. Play synthesized chess sound pack
     if (isSoundEnabled) {
@@ -1640,6 +1658,42 @@ export default function App() {
       lastMoveDark: "bg-teal-600/70 ring-1 ring-teal-500/50",
       dangerLight: "bg-red-100 border border-red-300",
       dangerDark: "bg-red-900/60 border border-red-400"
+    },
+    gold: {
+      name: "Imperial Gold",
+      lightSquare: "bg-[#FCF6E5]",
+      darkSquare: "bg-[#B59449]",
+      selected: "bg-yellow-100/90 ring-2 ring-yellow-600 ring-inset",
+      validDestLight: "bg-[#FEF08A]",
+      validDestDark: "bg-[#CA8A04]/90 text-yellow-50",
+      lastMoveLight: "bg-amber-100/70 ring-1 ring-amber-400/50",
+      lastMoveDark: "bg-amber-600/70 ring-1 ring-amber-500/50",
+      dangerLight: "bg-red-100 border border-red-300",
+      dangerDark: "bg-red-900/60 border border-red-400"
+    },
+    matrix: {
+      name: "The Matrix Digital",
+      lightSquare: "bg-[#161B16]",
+      darkSquare: "bg-[#050E05]",
+      selected: "bg-[#22C55E]/20 ring-2 ring-[#22C55E] ring-inset",
+      validDestLight: "bg-[#4ade80]/30 ring-1 ring-[#4ade80]",
+      validDestDark: "bg-[#15803d]/40 ring-1 ring-[#15803d]",
+      lastMoveLight: "bg-green-500/30 ring-1 ring-green-400/50",
+      lastMoveDark: "bg-green-600/40 ring-1 ring-green-500/50",
+      dangerLight: "bg-red-950/50 border border-red-500/50",
+      dangerDark: "bg-red-950/80 border border-red-600/50"
+    },
+    sakuraPastel: {
+      name: "Lavender Dreams",
+      lightSquare: "bg-[#FAF5FF]",
+      darkSquare: "bg-[#D8B4FE]",
+      selected: "bg-purple-200/90 ring-2 ring-purple-600 ring-inset",
+      validDestLight: "bg-[#E9D5FF]",
+      validDestDark: "bg-[#A855F7]/90 text-purple-50",
+      lastMoveLight: "bg-pink-100/70 ring-1 ring-pink-400/50",
+      lastMoveDark: "bg-pink-500/70 ring-1 ring-pink-500/50",
+      dangerLight: "bg-red-100 border border-red-350",
+      dangerDark: "bg-red-900/60 border border-red-400"
     }
   };
 
@@ -2409,7 +2463,7 @@ export default function App() {
             <div>
               <label className="text-[9px] text-slate-400 block mb-1.5 font-bold uppercase tracking-wider">Piece Style</label>
               <div className="grid grid-cols-3 gap-1 p-1 rounded-lg bg-slate-950 border border-slate-800/80">
-                {(["classic", "minimal", "abstract", "neon", "royal", "nature", "glass", "gothic", "shadow", "retro8bit", "space", "aurora", "steampunk", "origami", "cartoon"] as const).map((styleId) => {
+                {(["classic", "minimal", "abstract", "neon", "royal", "nature", "glass", "gothic", "shadow", "retro8bit", "space", "aurora", "steampunk", "origami", "cartoon", "egyptian", "pirate", "cyberGlitch"] as const).map((styleId) => {
                   const isSel = pieceStyle === styleId;
                   
                   // Display names for piece styles
@@ -2429,6 +2483,9 @@ export default function App() {
                     steampunk: "Steampunk Brass",
                     origami: "Origami Paper",
                     cartoon: "Cartoon Emoji",
+                    egyptian: "Egyptian Glyph",
+                    pirate: "Pirate Treasure",
+                    cyberGlitch: "Cyber Glitch",
                   };
                   
                   return (

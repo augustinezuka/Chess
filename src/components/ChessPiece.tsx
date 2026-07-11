@@ -4,7 +4,7 @@ interface ChessPieceProps {
   type: string; // 'p', 'r', 'n', 'b', 'q', 'k'
   color: "w" | "b";
   className?: string;
-  pieceStyle?: "classic" | "minimal" | "abstract" | "neon" | "royal" | "nature" | "glass" | "gothic" | "shadow" | "retro8bit" | "space" | "aurora" | "steampunk" | "origami" | "cartoon";
+  pieceStyle?: "classic" | "minimal" | "abstract" | "neon" | "royal" | "nature" | "glass" | "gothic" | "shadow" | "retro8bit" | "space" | "aurora" | "steampunk" | "origami" | "cartoon" | "egyptian" | "pirate" | "cyberGlitch";
 }
 
 export const ChessPiece: React.FC<ChessPieceProps> = ({
@@ -440,6 +440,93 @@ export const ChessPiece: React.FC<ChessPieceProps> = ({
         }`}
       >
         <span className="text-2.5xl md:text-3xl leading-none filter drop-shadow-[0_1px_0_rgba(0,0,0,0.2)]">
+          {pieceChar}
+        </span>
+      </div>
+    );
+  }
+
+  // 16. Ancient Egyptian Hieroglyphs
+  if (pieceStyle === "egyptian") {
+    const labels: Record<string, string> = {
+      k: "𓋹", // Ankh (Life/King)
+      q: "𓁐", // Goddess (Queen)
+      r: "𓉡", // Temple (Rook)
+      b: "𓅃", // Falcon Horus (Bishop)
+      n: "𓃗", // Horse (Knight)
+      p: "𓆣", // Scarab Beetle (Pawn)
+    };
+
+    const pieceChar = labels[lowerType] || "";
+
+    return (
+      <div
+        className={`flex items-center justify-center w-[85%] h-[85%] mx-auto rounded-full border shadow-md aspect-square select-none transition-all duration-150 ${
+          isWhite
+            ? "bg-gradient-to-br from-[#F5E6C9] via-[#E6D4B7] to-[#C8B28F] text-[#4E3629] border-[#B59C75] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.8),0_2px_4px_rgba(0,0,0,0.18)]"
+            : "bg-gradient-to-br from-[#403026] via-[#2F2119] to-[#1C120E] text-[#E6D4B7] border-[#251913] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.12),0_2px_4px_rgba(0,0,0,0.45)]"
+        }`}
+      >
+        <span className="text-2.5xl md:text-3xl leading-none font-bold filter drop-shadow-[0_1px_1px_rgba(0,0,0,0.15)]">
+          {pieceChar}
+        </span>
+      </div>
+    );
+  }
+
+  // 17. Pirate & Sea Treasure
+  if (pieceStyle === "pirate") {
+    const labels: Record<string, string> = {
+      k: "🏴‍☠️", // Pirate flag (King)
+      q: "💎", // Diamond (Queen)
+      r: "⚓", // Anchor (Rook)
+      b: "🦜", // Parrot (Bishop)
+      n: "🦈", // Shark (Knight)
+      p: "🪙", // Gold Coin (Pawn)
+    };
+
+    const pieceChar = labels[lowerType] || "";
+
+    return (
+      <div
+        className={`flex items-center justify-center w-[85%] h-[85%] mx-auto rounded-lg border-2 shadow-lg aspect-square select-none transition-all duration-150 ${
+          isWhite
+            ? "bg-gradient-to-br from-amber-100 to-yellow-500 text-[#2C1B10] border-amber-600 shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.8),0_2px_4px_rgba(0,0,0,0.25)]"
+            : "bg-gradient-to-br from-slate-700 via-slate-800 to-slate-950 text-slate-100 border-slate-900 shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.12),0_2px_4px_rgba(0,0,0,0.5)]"
+        }`}
+      >
+        <span className="text-2.5xl md:text-3xl leading-none filter drop-shadow-[0_1.5px_1px_rgba(0,0,0,0.25)]">
+          {pieceChar}
+        </span>
+      </div>
+    );
+  }
+
+  // 18. Cyber Chromatic Glitch
+  if (pieceStyle === "cyberGlitch") {
+    const unicodePieces: Record<string, string> = {
+      k: "♚\uFE0E",
+      q: "♛\uFE0E",
+      r: "♜\uFE0E",
+      b: "♝\uFE0E",
+      n: "♞\uFE0E",
+      p: "♟\uFE0E",
+    };
+
+    const pieceChar = unicodePieces[lowerType];
+    if (!pieceChar) return null;
+
+    return (
+      <div className="relative flex items-center justify-center w-full h-full text-4xl md:text-5xl select-none leading-none transition-all duration-150 group">
+        <span className={`absolute select-none font-extrabold opacity-70 animate-pulse text-red-500 translate-x-0.5 -translate-y-0.5`}>
+          {pieceChar}
+        </span>
+        <span className={`absolute select-none font-extrabold opacity-70 animate-pulse text-cyan-400 -translate-x-0.5 translate-y-0.5`}>
+          {pieceChar}
+        </span>
+        <span className={`absolute font-extrabold z-10 ${
+          isWhite ? "text-white" : "text-slate-950"
+        }`}>
           {pieceChar}
         </span>
       </div>
