@@ -47,6 +47,35 @@ import {
   TacticalLesson
 } from "./types";
 
+const getAiThinkingDuration = (difficulty: Difficulty, currentClockTime: number): number => {
+  // Base range depending on difficulty
+  let minSec = 1.5;
+  let maxSec = 3.0;
+  if (difficulty === "Easy") {
+    minSec = 0.8;
+    maxSec = 1.6;
+  } else if (difficulty === "Medium") {
+    minSec = 1.6;
+    maxSec = 3.2;
+  } else if (difficulty === "Hard") {
+    minSec = 3.0;
+    maxSec = 6.0;
+  }
+
+  // Generate a random duration in this range
+  let durationMs = (minSec + Math.random() * (maxSec - minSec)) * 1000;
+
+  // Time trouble adjustment: if the AI has less than 30 seconds left, speed up drastically
+  if (currentClockTime < 30000) {
+    durationMs = Math.min(durationMs, Math.max(400, currentClockTime * 0.12));
+  } else if (currentClockTime < 60000) {
+    // Less than 1 minute, speed up
+    durationMs = Math.min(durationMs, Math.max(800, currentClockTime * 0.22));
+  }
+
+  return durationMs;
+};
+
 export default function App() {
   // Navigation Tabs
   // "play" -> Active match screen
@@ -500,7 +529,14 @@ export default function App() {
 
     if (isAiTurn && !game.isGameOver() && !timerState.timeLimitExceeded) {
       setIsAiThinking(true);
-      // Run AI minimax move computation on a short timeout to prevent UI freezing
+
+      const aiColor = game.turn();
+      const currentClockTime = aiColor === "w" ? timerState.whiteTime : timerState.blackTime;
+      const thinkingDuration = timeControl === "None"
+        ? (0.5 + Math.random() * 0.7) * 1000
+        : getAiThinkingDuration(difficulty, currentClockTime);
+
+      // Run AI minimax move computation on a realistic timeout to keep game fair
       const aiTimer = setTimeout(() => {
         try {
           const currentFen = game.fen();
@@ -514,16 +550,22 @@ export default function App() {
             const resultMove = game.move(bestMoveSan);
 
             if (resultMove) {
-              // Deduct CPU calculation duration from the AI opponent's clock
+              const elapsedSinceLastTick = Date.now() - lastTickTimeRef.current;
+
+              // Deduct elapsed time precisely from the AI opponent's clock
               setTimerState((prev) => {
-                const newWhiteTime = turnBefore === "w" ? Math.max(0, prev.whiteTime - calculationDuration) : prev.whiteTime;
-                const newBlackTime = turnBefore === "b" ? Math.max(0, prev.blackTime - calculationDuration) : prev.blackTime;
+                const newWhiteTime = turnBefore === "w" ? Math.max(0, prev.whiteTime - elapsedSinceLastTick) : prev.whiteTime;
+                const newBlackTime = turnBefore === "b" ? Math.max(0, prev.blackTime - elapsedSinceLastTick) : prev.blackTime;
                 return {
                   ...prev,
                   whiteTime: newWhiteTime,
                   blackTime: newBlackTime,
+                  isActive: timeControl !== "None" ? true : prev.isActive,
                 };
               });
+
+              // Reset clock tick reference so the player's turn starts fresh
+              lastTickTimeRef.current = Date.now();
 
               addDyingPieceIfCaptured(resultMove);
               setFen(game.fen());
@@ -543,11 +585,11 @@ export default function App() {
         } finally {
           setIsAiThinking(false);
         }
-      }, 600);
+      }, thinkingDuration);
 
       return () => clearTimeout(aiTimer);
     }
-  }, [fen, gameMode, playerColor, difficulty]);
+  }, [fen, gameMode, playerColor, difficulty, timeControl]);
 
   // --- Update advantage bar from current board state ---
   const calculateAdvantage = (chessObj: Chess) => {
@@ -785,7 +827,7 @@ export default function App() {
         calculateAdvantage(game);
 
         // Turn on clocks on first moves
-        if (moveHistory.length === 0 && timeControl !== "None") {
+        if (!timerState.isActive && timeControl !== "None") {
           setTimerState((prev) => ({ ...prev, isActive: true }));
         }
 
